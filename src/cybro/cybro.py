@@ -27,10 +27,11 @@ VERSION_CACHE: TTLCache = TTLCache(maxsize=16, ttl=7200)
 
 @dataclass
 class Cybro:
-    """Main class for handling connections with WLED."""
+    """Main class for handling connections with Cybro scgi server."""
 
     host: str
     port: int = 4000
+    nad: int = 0
     request_timeout: float = 8.0
     session: aiohttp.client.ClientSession | None = None
 
@@ -42,40 +43,45 @@ class Cybro:
             await self.session.close()
             self.session = None
 
-    @backoff.on_exception(backoff.expo, CybroConnectionError, max_tries=3, logger=None)
+    @backoff.on_exception(
+        backoff.expo,
+        tuple([CybroConnectionError, CybroConnectionTimeoutError, CybroError]),
+        max_tries=3,
+        logger=None,
+    )
     async def request(
         self,
-        uri: str = "",
-        data: dict | None = None,
+        data: dict | str | None = None,
     ) -> Any:
-        """Handle a request to a WLED device.
+        """Handle a request to a scgi server.
 
         A generic method for sending/handling HTTP requests done gainst
-        the WLED device.
+        the scgi server.
 
         Args:
-            uri: Request URI, for example `/json/si`.
-            method: HTTP method to use for the request.E.g., "GET" or "POST".
-            data: Dictionary of data to send to the WLED device.
+            data: string / Dictionary of data to send to the scgi server.
 
         Returns:
-            A Python dictionary (JSON decoded) with the response from the
-            WLED device.
+            A Python dictionary with the response from the scgi server.
 
         Raises:
-            WLEDConnectionError: An error occurred while communitcation with
-                the WLED device.
-            WLEDConnectionTimeoutError: A timeout occurred while communicating
-                with the WLED device.
-            WLEDError: Received an unexpected response from the WLED device.
+            CybroConnectionError: An error occurred while communitcation with
+                the scgi server.
+            CybroConnectionTimeoutError: A timeout occurred while communicating
+                with the scgi server.
+            CybroError: Received an unexpected response from Cybro scgi server.
         """
-        if data is not None:
+        if isinstance(data, str):
             url = URL.build(
-                scheme="http", host=self.host, port=self.port, path="", query=data
+                scheme="http",
+                host=self.host,
+                port=self.port,
+                path="",
+                query_string=data,
             )
         else:
             url = URL.build(
-                scheme="http", host=self.host, port=self.port, path="", query_string=uri
+                scheme="http", host=self.host, port=self.port, path="", query=data
             )
 
         # some fix of query data
@@ -91,10 +97,8 @@ class Cybro:
 
         try:
             async with async_timeout.timeout(self.request_timeout):
-                print(url_fixed)
                 response = await self.session.get(
                     url=url_fixed,
-                    # method="GET",
                     allow_redirects=False,
                     ssl=False,
                     headers=headers,
@@ -113,7 +117,6 @@ class Cybro:
                 raise CybroError(response.status, {"message": contents.decode("utf8")})
 
             response_data = xmltodict.parse(await response.text())
-            # print(response_data.get("data"))
 
         except asyncio.TimeoutError as exception:
             raise CybroConnectionTimeoutError(
@@ -130,23 +133,22 @@ class Cybro:
     @backoff.on_exception(
         backoff.expo, CybroEmptyResponseError, max_tries=3, logger=None
     )
-    async def update(self, full_update: bool = False) -> Device:
-        """Get all information about the device in a single call.
+    async def update(self, full_update: bool = False, plc_nad: int = 0) -> Device:
+        """Get all variables in a single call.
 
-        This method updates all WLED information available with a single API
-        call.
+        This method updates all variable information with a single call.
 
         Args:
-            full_update: Force a full update from the WLED Device.
+            full_update: Force a full update from the device Device.
+            plc_nad: Address of PLC to read
 
         Returns:
-            WLED Device data.
+            Cybro Device data.
 
         Raises:
-            WLEDEmptyResponseError: The WLED device returned an empty response.
+            CybroEmptyResponseError: The Cybro scgi server returned an empty response.
         """
         if self._device is None or full_update:
-
             # read all relevant server vars
             _vars: dict[str, str] = {
                 "sys.scgi_port_status": "",
@@ -164,17 +166,28 @@ class Cybro:
                 "sys.udp_tx_count": "",
                 "sys.datalogger_status": "",
             }
+            if plc_nad != 0 and self.nad == 0:
+                self.nad = plc_nad
+            if self.nad != 0:
+                # read also specific plc variables
+                _controller = "c" + str(self.nad) + "."
+                _vars[_controller + "sys.ip_port"] = ""
+                _vars[_controller + "sys.timestamp"] = ""
+                _vars[_controller + "sys.plc_program_status"] = ""
+                _vars[_controller + "sys.response_time"] = ""
+                _vars[_controller + "sys.bytes_transferred"] = ""
+                _vars[_controller + "sys.comm_error_count"] = ""
+                _vars[_controller + "sys.alc_file"] = ""
+
             if not (data := await self.request(data=_vars)):
                 raise CybroEmptyResponseError(
                     f"Cybro scgi server at {self.host}:{self.port} returned an empty API"
                     " response on full update"
                 )
 
-            self._device = Device(data)
+            self._device = Device(data, plc_nad=self.nad)
 
             if len(self._device.user_vars) > 0:
-                cnt = len(self._device.user_vars)
-                print(f"Updating {cnt} user var(s)")
                 if not (data := await self.request(data=self._device.user_vars)):
                     raise CybroEmptyResponseError(
                         f"Cybro scgi server at {self.host}:{self.port} returned an empty"
@@ -186,8 +199,6 @@ class Cybro:
             return self._device
 
         if len(self._device.user_vars) > 0:
-            cnt = len(self._device.user_vars)
-            print(f"Updating {cnt} user var(s)")
             if not (data := await self.request(data=self._device.user_vars)):
                 raise CybroEmptyResponseError(
                     f"Cybro scgi server at {self.host}:{self.port} returned an empty"
@@ -214,7 +225,7 @@ class Cybro:
         self, name: str, var_type: VarType = VarType.STR
     ) -> str | int | float | bool:
         """read a single variable from scgi server"""
-        if not (data := await self.request(uri=name)):
+        if not (data := await self.request(data=name)):
             raise CybroEmptyResponseError(
                 f"Cybro scgi server at {self.host}:{self.port} returned an empty"
                 " response on read of {name}"
@@ -258,10 +269,6 @@ class Cybro:
     def remove_var(self, name: str) -> None:
         """remove a variable from update buffer"""
         self._device.remove_var(name)
-
-    async def reset(self) -> None:
-        """Reboot WLED device."""
-        await self.request("/reset")
 
     async def __aenter__(self) -> Cybro:
         """Async enter.

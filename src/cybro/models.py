@@ -1,4 +1,4 @@
-"""Models for Cybro scgi server."""
+"""Models for Cybro scgi server objects."""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -99,6 +99,83 @@ class ServerInfo:  # pylint:
 
 
 @dataclass
+class PlcInfo:  # pylint:
+    """Cybro PLC informations"""
+
+    nad: int
+    """Cybro PLC NAD"""
+    ip_port: str
+    """ip address and port, returned as "xxx.xxx.xxx.xxx:yyyy" """
+    timestamp: str
+    """time and date when the program is sent to controller"""
+    plc_program_status: str
+    """- "?", status unknown
+    - "-", no communication, controller is offline
+    - "missing", controller has no plc program
+    - "ok", controller is up and running"""
+    response_time: str
+    """number of milliseconds elapsed between request and response"""
+    bytes_transferred: int
+    """number of bytes, read and write, transfered beteeen server and controller"""
+    comm_error_count: int
+    """total number of communication errors encountered by controller"""
+    alc_file: str
+    """allocation file, directly from the Cybro file system"""
+    plc_vars: dict[str, str]
+    """holds all plc vars (needs to be filled after generating PLCInfo object by calling parse_alc_file())"""
+
+    @staticmethod
+    def from_dict(data: dict[str, Any], plc_nad: int) -> PlcInfo:
+        """generate PlcInfo object out of name / value dictionary"""
+        return PlcInfo(
+            nad=plc_nad,
+            ip_port=data["c" + str(plc_nad) + "sys.ip_port"],
+            timestamp=data["c" + str(plc_nad) + "sys.timestamp"],
+            plc_program_status=data["c" + str(plc_nad) + "sys.plc_program_status"],
+            response_time=data["c" + str(plc_nad) + "sys.response_time"],
+            bytes_transferred=data["c" + str(plc_nad) + "sys.bytes_transferred"],
+            comm_error_count=data["c" + str(plc_nad) + "sys.comm_error_count"],
+            alc_file=data["c" + str(plc_nad) + "sys.alc_file"],
+            plc_vars={},
+        )
+
+    @staticmethod
+    def from_vars(variables: dict[str, Var], plc_nad: int) -> PlcInfo:
+        """generate PlcInfo object out of name / Var object dictionary"""
+        return PlcInfo(
+            nad=plc_nad,
+            ip_port=variables.get("c" + str(plc_nad) + ".sys.ip_port", "").value,
+            timestamp=variables.get("c" + str(plc_nad) + ".sys.timestamp", "").value,
+            plc_program_status=variables.get(
+                "c" + str(plc_nad) + ".sys.plc_program_status", ""
+            ).value,
+            response_time=variables.get(
+                "c" + str(plc_nad) + ".sys.response_time", ""
+            ).value,
+            bytes_transferred=variables.get(
+                "c" + str(plc_nad) + ".sys.bytes_transferred", ""
+            ).value,
+            comm_error_count=variables.get(
+                "c" + str(plc_nad) + ".sys.comm_error_count", ""
+            ).value,
+            alc_file=variables.get("c" + str(plc_nad) + ".sys.alc_file", "").value,
+            plc_vars={},
+        )
+
+    def parse_alc_file(self) -> dict[str, str]:
+        """Shall be called after update of PlcInfo to refresh list of all plc vars"""
+        prefix = f"c{self.nad}."
+        res: dict[str, str] = {}
+        alc_lines = self.alc_file.splitlines()
+        for line in alc_lines[2:]:
+            typ = line[37:43].rstrip()
+            name = line[43:-1].split()[0].rstrip()
+            res[f"{prefix}{name}"] = typ
+            # print(f"{prefix}{name} = {typ}")
+        return res
+
+
+@dataclass
 class Var:
     """object representing a scgi server variable"""
 
@@ -127,17 +204,6 @@ class Var:
             # var_type=var_type,
         )
 
-    # @property
-    # def value(self) -> str | int | float | bool:
-    #    """return the current value"""
-    #    if self.var_type == VarType.STR:
-    #        return self.value_string
-    #    if self.var_type == VarType.FLOAT:
-    #        return self.value_float
-    #    if self.var_type == VarType.BOOL:
-    #        return self.value_bool
-    #    return self.value_int
-
     def value_string(self) -> str:
         """get current value"""
         return self.value
@@ -158,18 +224,22 @@ class Var:
 class Device:
     """Object holding all information of Cybro scgi server."""
 
+    info: str
     server_info: ServerInfo
+    plc_info: PlcInfo | None
     vars: dict[str, Var] = {}
     """list of variable / value / descriptions (after read/write)"""
     user_vars: dict[str, str] = {}
     """list of all variables to periodically update"""
     vars_types: dict[str, int] = {}
+    """list of variable types"""
 
-    def __init__(self, data: dict) -> None:
+    def __init__(self, data: dict, plc_nad: int = 0) -> None:
         """Initialize an empty Cybro scgi server device class.
 
         Args:
             data: The full API response from a Cybro scgi server device.
+            plc_nad: the Cybro PLC NAD
 
         Raises:
             CybroError: In case the given API response is incomplete in a way
@@ -179,19 +249,15 @@ class Device:
         if data["var"] is None:
             raise CybroError("Cybro data is incomplete, cannot construct device object")
 
-        # if any(
-        #    k not in data and data[k] is not None
-        #    for k in ("var")
-        # ):
-        #    raise CybroError("Cybro data is incomplete, cannot construct device object")
-        self.update_from_dict(data)
+        self.update_from_dict(data, plc_nad=plc_nad)
 
-    def update_from_dict(self, data: dict) -> Device:
+    def update_from_dict(self, data: dict, plc_nad: int = 0) -> Device:
         """Return Device object from Cybro scgi server response.
 
         Args:
             data: Update the device object with the data received from a
                 Cybro scgi server request.
+            plc_nad: Cybro PLC NAD
 
         Returns:
             The updated Device object.
@@ -201,8 +267,11 @@ class Device:
             self.vars.update({var["name"]: Var.from_dict(var)})
             self.vars_types.update({var["name"]: 0})
         self.server_info = ServerInfo.from_vars(self.vars)
+        self.info = "CybrotechScgiServer v" + self.server_info.server_version
 
-        # print(self.vars)
+        if plc_nad != 0:
+            self.plc_info = PlcInfo.from_vars(self.vars, plc_nad)
+            self.plc_info.parse_alc_file()
 
         return self
 
@@ -218,8 +287,10 @@ class Device:
         """
         # update user variable
         for _var in data["var"]:
-            self.vars.update({_var["name"]: Var.from_dict(_var)})
-            # self.user_vars.update({_var["name"]: ""})
+            if _var == "name":
+                self.vars.update({data["var"]["name"]: Var.from_dict(data)})
+            else:
+                self.vars.update({_var["name"]: Var.from_dict(_var)})
 
         return self
 
@@ -247,15 +318,16 @@ class Device:
             return self.vars[_var["name"]].value
         return "?"
 
-    def add_var(self, name, var_type: VarType = 0) -> None:
+    def add_var(self, name: str, var_type: VarType = 0) -> None:
         """Adds a variable to the update list.
 
         Args:
-            name: Variable name to read eg: c1000.scan_time"""
+            name: Variable name to read eg: c1000.scan_time
+            var_type: Optionally defines a Varaibe Type"""
         self.user_vars.update({name: ""})
         self.vars_types.update({name: var_type})
 
-    def remove_var(self, name) -> None:
+    def remove_var(self, name: str) -> None:
         """Removes a variable from the read list"""
         self.user_vars.pop(name)
         self.vars_types.pop(name)
