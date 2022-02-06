@@ -1,6 +1,6 @@
 {
   "name": "cybro",
-  "version": "0.0.0",
+  "version": "0.0.3",
   "private": true,
   "description": "Asynchronous Python client for Cybro Scgi Server",
   "scripts": {

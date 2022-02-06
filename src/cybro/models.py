@@ -172,6 +172,7 @@ class PlcInfo:  # pylint:
             name = line[43:-1].split()[0].rstrip()
             res[f"{prefix}{name}"] = typ
             # print(f"{prefix}{name} = {typ}")
+        self.plc_vars = res
         return res
 
 

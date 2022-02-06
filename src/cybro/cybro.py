@@ -214,9 +214,12 @@ class Cybro:
     @backoff.on_exception(
         backoff.expo, CybroEmptyResponseError, max_tries=3, logger=None
     )
-    async def write_var(self, name: str, value: str) -> None:
+    async def write_var(
+        self, name: str, value: str, var_type: VarType = VarType.STR
+    ) -> str | int | float | bool:
         """write a single variable to scgi server"""
-        await self.request(data={name: value})
+        data = await self.request(data={name: value})
+        return self._device.update_var(data, var_type=var_type)
 
     @backoff.on_exception(
         backoff.expo, CybroEmptyResponseError, max_tries=3, logger=None
