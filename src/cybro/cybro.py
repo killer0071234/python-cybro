@@ -10,9 +10,9 @@ from typing import Any
 import aiohttp
 import async_timeout
 import backoff
+import xmltodict
 from cachetools import TTLCache
 from yarl import URL
-import xmltodict
 
 from .exceptions import (
     CybroConnectionError,

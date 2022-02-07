@@ -1,17 +1,7 @@
 """Asynchronous Python client for Cybro."""
 
-from .models import (
-    ServerInfo,
-    Device,
-    Var,
-    VarType,
-)
-from .cybro import (
-    Cybro,
-    CybroConnectionError,
-    CybroConnectionTimeoutError,
-    CybroError,
-)
+from .cybro import Cybro, CybroConnectionError, CybroConnectionTimeoutError, CybroError
+from .models import Device, ServerInfo, Var, VarType
 
 __all__ = [
     "Device",

@@ -2,9 +2,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-
-from typing import Any
 from enum import IntEnum
+from typing import Any
 
 from .exceptions import CybroError, CybroPlcNotFoundError
 
