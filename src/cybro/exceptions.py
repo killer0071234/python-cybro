@@ -15,3 +15,7 @@ class CybroConnectionError(CybroError):
 
 class CybroConnectionTimeoutError(CybroConnectionError):
     """Cybro connection Timeout exception."""
+
+
+class CybroPlcNotFoundError(CybroError):
+    """Cybro PLC (info) not found."""

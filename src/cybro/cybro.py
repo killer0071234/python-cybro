@@ -32,10 +32,25 @@ class Cybro:
     host: str
     port: int = 4000
     nad: int = 0
+    path: str = ""
     request_timeout: float = 8.0
     session: aiohttp.client.ClientSession | None = None
 
     _device: Device | None = None
+
+    def __init__(self, host_str: str, port: int = 4000, nad: int = 0) -> None:
+        new_host = host_str
+        new_path = ""
+        if new_host.find("//") >= 0:
+            new_host = new_host.split("//")[1]
+        if new_host.find("/") >= 0:
+            new_path = "/" + "/".join(new_host.split("/")[1:])
+            new_host = new_host.split("/")[0]
+        url = URL.build(scheme="http", host=new_host, path=new_path)
+        self.host = url.host
+        self.path = url.path
+        self.port = port
+        self.nad = nad
 
     async def disconnect(self) -> None:
         """disconnect from cybro scgi server object"""
@@ -76,12 +91,16 @@ class Cybro:
                 scheme="http",
                 host=self.host,
                 port=self.port,
-                path="",
+                path=self.path,
                 query_string=data,
             )
         else:
             url = URL.build(
-                scheme="http", host=self.host, port=self.port, path="", query=data
+                scheme="http",
+                host=self.host,
+                port=self.port,
+                path=self.path,
+                query=data,
             )
 
         # some fix of query data

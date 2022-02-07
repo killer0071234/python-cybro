@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Any
 from enum import IntEnum
 
-from .exceptions import CybroError
+from .exceptions import CybroError, CybroPlcNotFoundError
 
 
 @dataclass
@@ -141,26 +141,45 @@ class PlcInfo:  # pylint:
 
     @staticmethod
     def from_vars(variables: dict[str, Var], plc_nad: int) -> PlcInfo:
-        """generate PlcInfo object out of name / Var object dictionary"""
-        return PlcInfo(
-            nad=plc_nad,
-            ip_port=variables.get("c" + str(plc_nad) + ".sys.ip_port", "").value,
-            timestamp=variables.get("c" + str(plc_nad) + ".sys.timestamp", "").value,
-            plc_program_status=variables.get(
-                "c" + str(plc_nad) + ".sys.plc_program_status", ""
-            ).value,
-            response_time=variables.get(
-                "c" + str(plc_nad) + ".sys.response_time", ""
-            ).value,
-            bytes_transferred=variables.get(
-                "c" + str(plc_nad) + ".sys.bytes_transferred", ""
-            ).value,
-            comm_error_count=variables.get(
-                "c" + str(plc_nad) + ".sys.comm_error_count", ""
-            ).value,
-            alc_file=variables.get("c" + str(plc_nad) + ".sys.alc_file", "").value,
-            plc_vars={},
-        )
+        """generate PlcInfo object out of name / Var object dictionary
+
+        Args:
+            variables: Force a full update from the device Device.
+            plc_nad: Address of PLC
+
+        Returns:
+            PlcInfo data.
+
+        Raises:
+            CybroPlcNotFoundError: The Cybro scgi server returned no or incomlete PLC data.
+        """
+        nad = plc_nad
+        try:
+            return PlcInfo(
+                nad=nad,
+                ip_port=variables.get("c" + str(plc_nad) + ".sys.ip_port", "").value,
+                timestamp=variables.get(
+                    "c" + str(plc_nad) + ".sys.timestamp", ""
+                ).value,
+                plc_program_status=variables.get(
+                    "c" + str(plc_nad) + ".sys.plc_program_status", ""
+                ).value,
+                response_time=variables.get(
+                    "c" + str(plc_nad) + ".sys.response_time", ""
+                ).value,
+                bytes_transferred=variables.get(
+                    "c" + str(plc_nad) + ".sys.bytes_transferred", ""
+                ).value,
+                comm_error_count=variables.get(
+                    "c" + str(plc_nad) + ".sys.comm_error_count", ""
+                ).value,
+                alc_file=variables.get("c" + str(plc_nad) + ".sys.alc_file", "").value,
+                plc_vars={},
+            )
+        except AttributeError:
+            raise CybroPlcNotFoundError(
+                f"Cybro PLC with NAD {nad} not found"
+            ) from AttributeError
 
     def parse_alc_file(self) -> dict[str, str]:
         """Shall be called after update of PlcInfo to refresh list of all plc vars"""
