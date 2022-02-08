@@ -38,7 +38,21 @@ class Cybro:
 
     _device: Device | None = None
 
-    def __init__(self, host_str: str, port: int = 4000, nad: int = 0) -> None:
+    def __init__(
+        self,
+        host_str: str,
+        port: int = 4000,
+        nad: int = 0,
+        session: aiohttp.client.ClientSession | None = None,
+    ) -> None:
+        """Defines a new Cybro scgi server session.
+
+        Args:
+            host_str: Cybro scgi server connection string
+            port: Cybro scgi server port (Default: 4000)
+            nad: Cybro PLC NAD (Network address)
+            session: optional a aiohttp session
+        """
         new_host = host_str
         new_path = ""
         if new_host.find("//") >= 0:
@@ -51,6 +65,8 @@ class Cybro:
         self.path = url.path
         self.port = port
         self.nad = nad
+        if session is not None:
+            self.session = session
 
     async def disconnect(self) -> None:
         """disconnect from cybro scgi server object"""
