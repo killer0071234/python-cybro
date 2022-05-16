@@ -6,5 +6,11 @@ numpy
 cachetools
 backoff
 # for debug
+poetry
+pre-commit
 pylint
 black
+vulture
+tox
+tox-pip-version
+colorlog
