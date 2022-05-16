@@ -2,9 +2,9 @@
 """Asynchronous Python client for Cybro."""
 
 import asyncio
-from src.cybro.models import VarType
 
-from src.cybro.cybro import Cybro
+from cybro.cybro import Cybro
+from cybro.models import VarType
 
 
 async def main():
@@ -57,12 +57,6 @@ async def main():
         # if isinstance(device.state.preset, Preset):
         #    print(f"Preset active! Name: {device.state.preset.name}")
 
-        # if isinstance(device.state.playlist, Playlist):
-        #    print(f"Playlist active! Name: {device.state.playlist.name}")
-
-        ## Turn strip on, full brightness
-        # await led.master(on=True, brightness=255)
-        # close connection and release resources
         await cybro.disconnect()
 
 
