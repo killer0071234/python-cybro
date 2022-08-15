@@ -5,6 +5,7 @@ import asyncio
 import json
 import socket
 from dataclasses import dataclass
+from itertools import islice
 from typing import Any
 
 import aiohttp
@@ -23,6 +24,8 @@ from .exceptions import (
 from .models import Device, VarType
 
 VERSION_CACHE: TTLCache = TTLCache(maxsize=16, ttl=7200)
+
+VAR_CHUNK_SIZE: int = 25
 
 
 @dataclass
@@ -45,7 +48,7 @@ class Cybro:
         nad: int = 0,
         session: aiohttp.client.ClientSession | None = None,
     ) -> None:
-        """Defines a new Cybro scgi server session.
+        """Define a new Cybro scgi server session.
 
         Args:
             host_str: Cybro scgi server connection string
@@ -69,14 +72,14 @@ class Cybro:
             self.session = session
 
     async def disconnect(self) -> None:
-        """disconnect from cybro scgi server object"""
+        """Disconnect from cybro scgi server object."""
         if self.session is not None:
             await self.session.close()
             self.session = None
 
     @backoff.on_exception(
         backoff.expo,
-        tuple([CybroConnectionError, CybroConnectionTimeoutError, CybroError]),
+        {CybroConnectionError, CybroConnectionTimeoutError, CybroError},
         max_tries=3,
         logger=None,
     )
@@ -223,24 +226,26 @@ class Cybro:
             self._device = Device(data, plc_nad=self.nad)
 
             if len(self._device.user_vars) > 0:
-                if not (data := await self.request(data=self._device.user_vars)):
-                    raise CybroEmptyResponseError(
-                        f"Cybro scgi server at {self.host}:{self.port} returned an empty"
-                        " response on full update"
-                    )
-
-                self._device.update_user_var_from_dict(data=data)
+                _user_vars = _get_chunk(self._device.user_vars, VAR_CHUNK_SIZE)
+                for _vars in _user_vars:
+                    if not (data := await self.request(data=_vars)):
+                        raise CybroEmptyResponseError(
+                            f"Cybro scgi server at {self.host}:{self.port} returned an empty"
+                            " response on full update"
+                        )
+                    self._device.update_user_var_from_dict(data=data)
 
             return self._device
 
         if len(self._device.user_vars) > 0:
-            if not (data := await self.request(data=self._device.user_vars)):
-                raise CybroEmptyResponseError(
-                    f"Cybro scgi server at {self.host}:{self.port} returned an empty"
-                    " response on full update"
-                )
-
-            self._device.update_user_var_from_dict(data=data)
+            _user_vars = _get_chunk(self._device.user_vars, VAR_CHUNK_SIZE)
+            for _vars in _user_vars:
+                if not (data := await self.request(data=_vars)):
+                    raise CybroEmptyResponseError(
+                        f"Cybro scgi server at {self.host}:{self.port} returned an empty"
+                        " response on user update"
+                    )
+                self._device.update_user_var_from_dict(data=data)
 
             return self._device
 
@@ -252,7 +257,7 @@ class Cybro:
     async def write_var(
         self, name: str, value: str, var_type: VarType = VarType.STR
     ) -> str | int | float | bool:
-        """write a single variable to scgi server"""
+        """Write a single variable to scgi server."""
         data = await self.request(data={name: value})
         return self._device.update_var(data, var_type=var_type)
 
@@ -262,7 +267,7 @@ class Cybro:
     async def read_var(
         self, name: str, var_type: VarType = VarType.STR
     ) -> str | int | float | bool:
-        """read a single variable from scgi server"""
+        """Read a single variable from scgi server."""
         if not (data := await self.request(data=name)):
             raise CybroEmptyResponseError(
                 f"Cybro scgi server at {self.host}:{self.port} returned an empty"
@@ -277,7 +282,7 @@ class Cybro:
         self,
         name: str,
     ) -> int:
-        """read a single variable from scgi server as int"""
+        """Read a single variable from scgi server as int."""
         return await self.read_var(name, VarType.INT)
 
     @backoff.on_exception(
@@ -287,7 +292,7 @@ class Cybro:
         self,
         name: str,
     ) -> float:
-        """read a single variable from scgi server as float"""
+        """Read a single variable from scgi server as float."""
         return await self.read_var(name, VarType.FLOAT)
 
     @backoff.on_exception(
@@ -297,15 +302,15 @@ class Cybro:
         self,
         name: str,
     ) -> bool:
-        """read a single variable from scgi server as float"""
+        """Read a single variable from scgi server as float."""
         return await self.read_var(name, VarType.BOOL)
 
     def add_var(self, name: str) -> None:
-        """add a variable into update buffer"""
+        """Add a variable into update buffer."""
         self._device.add_var(name)
 
     def remove_var(self, name: str) -> None:
-        """remove a variable from update buffer"""
+        """Remove a variable from update buffer."""
         self._device.remove_var(name)
 
     async def __aenter__(self) -> Cybro:
@@ -322,3 +327,10 @@ class Cybro:
         Args:
             _exc_info: Exec type.
         """
+
+
+def _get_chunk(data, chunk_size):
+    """Split dictionary into smaller chunks."""
+    data_it = iter(data)
+    for i in range(0, len(data), chunk_size):
+        yield {k: data[k] for k in islice(data_it, chunk_size)}
