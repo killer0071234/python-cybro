@@ -13,7 +13,7 @@ async def main():
     prefix = f"c{nad}."
     async with Cybro("solar-cybro.com/scgi/", 80, nad) as cybro:
         device = await cybro.update()
-        print(device.server_info.server_version)
+        print("server_version -> " + device.server_info.server_version)
         print("ip_port -> " + device.plc_info.ip_port)
         print("timestamp -> " + device.plc_info.timestamp)
         print("plc_program_status -> " + device.plc_info.plc_program_status)
