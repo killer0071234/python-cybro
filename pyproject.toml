@@ -34,7 +34,7 @@ cachetools = ">=5.0.0"
 
 [tool.poetry.dev-dependencies]
 aresponses = "^2.1.4"
-black = "^21.12b0"
+black = "^22.6"
 blacken-docs = "^1.12.0"
 coverage = {version = "^6.2", extras = ["toml"]}
 flake8 = "^4.0.1"
