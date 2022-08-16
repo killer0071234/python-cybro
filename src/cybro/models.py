@@ -5,12 +5,13 @@ from dataclasses import dataclass
 from enum import IntEnum
 from typing import Any
 
-from .exceptions import CybroError, CybroPlcNotFoundError
+from .exceptions import CybroError
+from .exceptions import CybroPlcNotFoundError
 
 
 @dataclass
 class ServerInfo:  # pylint:
-    """Cybro scgi server informations"""
+    """Cybro scgi server information."""
 
     scgi_port_status: str
     """- no response, server is down
@@ -99,7 +100,7 @@ class ServerInfo:  # pylint:
 
 @dataclass
 class PlcInfo:  # pylint:
-    """Cybro PLC informations"""
+    """Cybro PLC information."""
 
     nad: int
     """Cybro PLC NAD"""
@@ -115,7 +116,7 @@ class PlcInfo:  # pylint:
     response_time: str
     """number of milliseconds elapsed between request and response"""
     bytes_transferred: int
-    """number of bytes, read and write, transfered beteeen server and controller"""
+    """number of bytes, read and write, transferred between server and controller"""
     comm_error_count: int
     """total number of communication errors encountered by controller"""
     alc_file: str

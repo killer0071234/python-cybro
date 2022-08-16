@@ -15,13 +15,12 @@ import xmltodict
 from cachetools import TTLCache
 from yarl import URL
 
-from .exceptions import (
-    CybroConnectionError,
-    CybroConnectionTimeoutError,
-    CybroEmptyResponseError,
-    CybroError,
-)
-from .models import Device, VarType
+from .exceptions import CybroConnectionError
+from .exceptions import CybroConnectionTimeoutError
+from .exceptions import CybroEmptyResponseError
+from .exceptions import CybroError
+from .models import Device
+from .models import VarType
 
 VERSION_CACHE: TTLCache = TTLCache(maxsize=16, ttl=7200)
 
