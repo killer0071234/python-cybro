@@ -2,7 +2,7 @@
   "name": "cybro Dev",
   "context": "..",
   "dockerFile": "../Dockerfile.dev",
-  //"postCreateCommand": "script/setup",
+  "postCreateCommand": ".devcontainer/setup.sh",
   //"postStartCommand": "script/bootstrap",
   "containerEnv": { "DEVCONTAINER": "1" },
   //"appPort": 8123,

@@ -1,6 +1,5 @@
 # pylint: disable=W0621
 """Asynchronous Python client for Cybro."""
-
 import asyncio
 
 from cybro.cybro import Cybro
