@@ -170,7 +170,9 @@ class Cybro:
     @backoff.on_exception(
         backoff.expo, CybroEmptyResponseError, max_tries=3, logger=None
     )
-    async def update(self, full_update: bool = False, plc_nad: int = 0) -> Device:
+    async def update(
+        self, full_update: bool = False, plc_nad: int = 0, device_type: int = 0
+    ) -> Device:
         """Get all variables in a single call.
 
         This method updates all variable information with a single call.
@@ -178,6 +180,7 @@ class Cybro:
         Args:
             full_update: Force a full update from the device Device.
             plc_nad: Address of PLC to read
+            device_type: 0 = undefined / generic PLC, 1 = HIQ-controller
 
         Returns:
             Cybro Device data.
@@ -215,6 +218,9 @@ class Cybro:
                 _vars[_controller + "sys.bytes_transferred"] = ""
                 _vars[_controller + "sys.comm_error_count"] = ""
                 _vars[_controller + "sys.alc_file"] = ""
+                # read / prepare specific vars for HIQ-controller
+                if device_type == 1:
+                    _vars = _add_hiq_tags(_vars, _controller)
 
             if not (data := await self.request(data=_vars)):
                 raise CybroEmptyResponseError(
@@ -333,3 +339,45 @@ def _get_chunk(data, chunk_size):
     data_it = iter(data)
     for i in range(0, len(data), chunk_size):
         yield {k: data[k] for k in islice(data_it, chunk_size)}
+
+
+def _add_hiq_tags(
+    variables: dict[str, str], controller: str = "c10000."
+) -> dict[str, str]:
+    """Adds controller specific general error tags."""
+    _vars = variables
+    _vars[controller + "lc00_general_error"] = ""
+    _vars[controller + "lc01_general_error"] = ""
+    _vars[controller + "lc02_general_error"] = ""
+    _vars[controller + "lc03_general_error"] = ""
+    _vars[controller + "lc04_general_error"] = ""
+    _vars[controller + "lc05_general_error"] = ""
+    _vars[controller + "lc06_general_error"] = ""
+    _vars[controller + "lc07_general_error"] = ""
+    _vars[controller + "ld00_general_error"] = ""
+    _vars[controller + "ld01_general_error"] = ""
+    _vars[controller + "ld02_general_error"] = ""
+    _vars[controller + "ld03_general_error"] = ""
+    _vars[controller + "bc00_general_error"] = ""
+    _vars[controller + "bc01_general_error"] = ""
+    _vars[controller + "bc02_general_error"] = ""
+    _vars[controller + "bc03_general_error"] = ""
+    _vars[controller + "bc04_general_error"] = ""
+    _vars[controller + "bc05_general_error"] = ""
+    _vars[controller + "sc00_general_error"] = ""
+    _vars[controller + "sc01_general_error"] = ""
+    _vars[controller + "sc02_general_error"] = ""
+    _vars[controller + "sc03_general_error"] = ""
+    _vars[controller + "th00_general_error"] = ""
+    _vars[controller + "th01_general_error"] = ""
+    _vars[controller + "th02_general_error"] = ""
+    _vars[controller + "th03_general_error"] = ""
+    _vars[controller + "th04_general_error"] = ""
+    _vars[controller + "th05_general_error"] = ""
+    _vars[controller + "fc00_general_error"] = ""
+    _vars[controller + "fc01_general_error"] = ""
+    _vars[controller + "fc02_general_error"] = ""
+    _vars[controller + "fc03_general_error"] = ""
+    _vars[controller + "fc04_general_error"] = ""
+    _vars[controller + "fc05_general_error"] = ""
+    return _vars
