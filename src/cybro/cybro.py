@@ -344,7 +344,15 @@ def _get_chunk(data, chunk_size):
 def _add_hiq_tags(
     variables: dict[str, str], controller: str = "c10000."
 ) -> dict[str, str]:
-    """Adds controller specific general error tags."""
+    """Adds controller specific general error tags.
+
+    Args:
+        variables: current list of variables to add to it
+        controller: controller prefix (Default: c10000.)
+
+    Returns:
+        An updated dictionary of variables that includes HIQ controller specific variables.
+    """
     _vars = variables
     _vars[controller + "lc00_general_error"] = ""
     _vars[controller + "lc01_general_error"] = ""
