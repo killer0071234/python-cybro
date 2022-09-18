@@ -185,13 +185,15 @@ class PlcInfo:  # pylint:
         """Shall be called after update of PlcInfo to refresh list of all plc vars"""
         prefix = f"c{self.nad}."
         res: dict[str, str] = {}
+        if self.alc_file is None:
+            self.plc_vars = res
+            return res
         alc_lines = self.alc_file.splitlines()
         for line in alc_lines[2:]:
             typ = line[37:43].rstrip()
             name = line[43:-1].split()[0].rstrip()
             res[f"{prefix}{name}"] = typ
-            # print(f"{prefix}{name} = {typ}")
-        self.plc_vars = res
+            self.plc_vars = res
         return res
 
 
