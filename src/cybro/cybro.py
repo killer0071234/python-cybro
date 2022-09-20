@@ -98,7 +98,7 @@ class Cybro:
             A Python dictionary with the response from the scgi server.
 
         Raises:
-            CybroConnectionError: An error occurred while communitcation with
+            CybroConnectionError: An error occurred while communicating with
                 the scgi server.
             CybroConnectionTimeoutError: A timeout occurred while communicating
                 with the scgi server.
