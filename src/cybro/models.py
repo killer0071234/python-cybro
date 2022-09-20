@@ -171,13 +171,13 @@ class PlcInfo:  # pylint:
         try:
             return PlcInfo(
                 nad=plc_nad,
-                ip_port=data["c" + str(plc_nad) + "sys.ip_port"],
-                timestamp=data["c" + str(plc_nad) + "sys.timestamp"],
-                plc_program_status=data["c" + str(plc_nad) + "sys.plc_program_status"],
-                response_time=data["c" + str(plc_nad) + "sys.response_time"],
-                bytes_transferred=data["c" + str(plc_nad) + "sys.bytes_transferred"],
-                comm_error_count=data["c" + str(plc_nad) + "sys.comm_error_count"],
-                alc_file=data["c" + str(plc_nad) + "sys.alc_file"],
+                ip_port=data["c" + str(plc_nad) + ".sys.ip_port"],
+                timestamp=data["c" + str(plc_nad) + ".sys.timestamp"],
+                plc_program_status=data["c" + str(plc_nad) + ".sys.plc_program_status"],
+                response_time=data["c" + str(plc_nad) + ".sys.response_time"],
+                bytes_transferred=data["c" + str(plc_nad) + ".sys.bytes_transferred"],
+                comm_error_count=data["c" + str(plc_nad) + ".sys.comm_error_count"],
+                alc_file=data["c" + str(plc_nad) + ".sys.alc_file"],
                 plc_vars={},
             )
         except AttributeError:
