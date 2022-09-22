@@ -61,12 +61,12 @@ jobs:
         uses: actions/cache@v3
         with:
           path: ${{ steps.pip-cache.outputs.dir }}
-          key: pip-${{ steps.python.outputs.python-version }}-${{ hashFiles('.github/workflows/requirements.txt') }}
+          key: pip-${{ steps.python.outputs.python-version }}-${{ hashFiles('requirements.txt') }}
           restore-keys: |
             pip-${{ steps.python.outputs.python-version }}-
       - name: 🏗 Install workflow dependencies
         run: |
-          pip install -r .github/workflows/requirements.txt
+          pip install -r requirements.txt
           poetry config virtualenvs.create true
           poetry config virtualenvs.in-project true
       - name: ⤵️ Restore cached Python virtual environment
@@ -108,12 +108,12 @@ jobs:
         uses: actions/cache@v3
         with:
           path: ${{ steps.pip-cache.outputs.dir }}
-          key: pip-${{ steps.python.outputs.python-version }}-${{ hashFiles('.github/workflows/requirements.txt') }}
+          key: pip-${{ steps.python.outputs.python-version }}-${{ hashFiles('requirements.txt') }}
           restore-keys: |
             pip-${{ steps.python.outputs.python-version }}-
       - name: 🏗 Install workflow dependencies
         run: |
-          pip install -r .github/workflows/requirements.txt
+          pip install -r requirements.txt
           poetry config virtualenvs.create true
           poetry config virtualenvs.in-project true
       - name: ⤵️ Restore cached Python virtual environment
