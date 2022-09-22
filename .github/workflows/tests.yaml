@@ -33,7 +33,7 @@ jobs:
 
       - name: Install Python modules
         run: |
-          pip install --constraint=.github/workflows/constraints.txt pre-commit black flake8 reorder-python-imports poetry pytest pytest-asyncio pytest-cov
+          pip install --constraint=.github/workflows/constraints.txt pre-commit black flake8 reorder-python-imports poetry pytest pytest-asyncio pytest-cov aiohttp async_timeout yarl xmltodict
 
       - name: Run pre-commit on all files
         run: |
