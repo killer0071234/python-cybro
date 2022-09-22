@@ -87,10 +87,8 @@ class ServerInfo:  # pylint:
                 udp_tx_count=data["sys.udp_tx_count"],
                 datalogger_status=data["sys.datalogger_status"],
             )
-        except AttributeError:
-            raise CybroError(
-                "Not all ServerInfo tags found in data"
-            ) from AttributeError
+        except KeyError:
+            raise CybroError("Not all ServerInfo tags found in data") from KeyError
 
     @staticmethod
     def from_vars(variables: dict[str, Var]) -> ServerInfo:
@@ -166,7 +164,7 @@ class PlcInfo:  # pylint:
             PlcInfo data.
 
         Raises:
-            CybroError: The Cybro scgi server returned no or incomlete PLC data.
+            CybroPlcNotFoundError: The Cybro scgi server returned no or incomlete PLC data.
         """
         try:
             return PlcInfo(
@@ -180,10 +178,10 @@ class PlcInfo:  # pylint:
                 alc_file=data["c" + str(plc_nad) + ".sys.alc_file"],
                 plc_vars={},
             )
-        except AttributeError:
-            raise CybroError(
+        except KeyError:
+            raise CybroPlcNotFoundError(
                 "Not all ServerInfo tags found in data"
-            ) from AttributeError
+            ) from KeyError
 
     @staticmethod
     def from_vars(variables: dict[str, Var], plc_nad: int) -> PlcInfo:
@@ -346,7 +344,7 @@ class Device:
 
         return self
 
-    def update_user_var_from_dict(self, data: dict) -> None:
+    def update_user_var_from_dict(self, data: dict) -> Device:
         """Parses user variables from Cybro scgi server response.
 
         Args:
@@ -354,15 +352,17 @@ class Device:
                 Cybro scgi server request.
 
         Returns:
-            None.
+            The updated Device object.
         """
         # update user variable
-        for _var in data["var"]:
-            if _var == "name":
-                self.vars.update({data["var"]["name"]: Var.from_dict(data)})
-            else:
-                self.vars.update({_var["name"]: Var.from_dict(_var)})
-
+        try:
+            for _var in data["var"]:
+                if _var == "name":
+                    self.vars.update({data["var"]["name"]: Var.from_dict(data)})
+                else:
+                    self.vars.update({_var["name"]: Var.from_dict(_var)})
+        except (KeyError, TypeError):
+            pass
         return self
 
     def update_var(self, data: dict, var_type: VarType = 0) -> str | bool | int | float:
@@ -376,17 +376,17 @@ class Device:
         Returns:
             The value of the var
         """
-        if len(data) == 1:
-            self.vars.update({data["var"]["name"]: Var.from_dict(data["var"])})
-            self.vars_types.update({data["var"]["name"]: var_type})
-            self.user_vars.update({data["var"]["name"]: ""})
-            return self.vars[data["var"]["name"]].value
-
-        for _var in data["var"]:
-            self.vars.update({_var["name"]: Var.from_dict(_var)})
-            self.vars_types.update({_var["name"]: var_type})
-            self.user_vars.update({_var["name"]: ""})
-            return self.vars[_var["name"]].value
+        try:
+            for _var in data["var"]:
+                if _var == "name":
+                    # single var entry found
+                    _var = data["var"]
+                self.vars.update({_var["name"]: Var.from_dict(_var)})
+                self.vars_types.update({_var["name"]: var_type})
+                self.user_vars.update({_var["name"]: ""})
+                return self.vars[_var["name"]].value
+        except (KeyError, TypeError):
+            pass
         return "?"
 
     def add_var(self, name: str, var_type: VarType = 0) -> None:
