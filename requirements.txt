@@ -14,3 +14,9 @@ vulture
 tox
 tox-pip-version
 colorlog
+pytest
+pytest-asyncio
+pytest-cov
+blacken-docs
+reorder-python-imports
+aioresponses

@@ -59,43 +59,71 @@ class ServerInfo:  # pylint:
 
     @staticmethod
     def from_dict(data: dict[str, Any]) -> ServerInfo:
-        """generate ServerInfo object out of name / value dictionary"""
-        return ServerInfo(
-            scgi_port_status=data["sys.scgi_port_status"],
-            server_uptime=data["sys.server_uptime"],
-            scgi_request_pending=data["sys.scgi_request_pending"],
-            scgi_request_count=data["sys.scgi_request_count"],
-            push_port_status=data["sys.push_port_status"],
-            push_count=data["sys.push_count"],
-            push_ack_errors=data["sys.push_ack_errors"],
-            push_list_count=data["sys.push_list_count"],
-            cache_request=data["sys.cache_request"],
-            cache_valid=data["sys.cache_valid"],
-            server_version=data["sys.server_version"],
-            udp_rx_count=data["sys.udp_rx_count"],
-            udp_tx_count=data["sys.udp_tx_count"],
-            datalogger_status=data["sys.datalogger_status"],
-        )
+        """generate ServerInfo object out of name / value dictionary
+
+        Args:
+            data: Received data from SCGI server.
+
+        Returns:
+            ServerInfo data.
+
+        Raises:
+            CybroError: The Cybro SCGI server returned no or incomlete Server info data.
+        """
+        try:
+            return ServerInfo(
+                scgi_port_status=data["sys.scgi_port_status"],
+                server_uptime=data["sys.server_uptime"],
+                scgi_request_pending=data["sys.scgi_request_pending"],
+                scgi_request_count=data["sys.scgi_request_count"],
+                push_port_status=data["sys.push_port_status"],
+                push_count=data["sys.push_count"],
+                push_ack_errors=data["sys.push_ack_errors"],
+                push_list_count=data["sys.push_list_count"],
+                cache_request=data["sys.cache_request"],
+                cache_valid=data["sys.cache_valid"],
+                server_version=data["sys.server_version"],
+                udp_rx_count=data["sys.udp_rx_count"],
+                udp_tx_count=data["sys.udp_tx_count"],
+                datalogger_status=data["sys.datalogger_status"],
+            )
+        except KeyError:
+            raise CybroError("Not all ServerInfo tags found in data") from KeyError
 
     @staticmethod
     def from_vars(variables: dict[str, Var]) -> ServerInfo:
-        """generate ServerInfo object out of name / Var object dictionary"""
-        return ServerInfo(
-            scgi_port_status=variables.get("sys.scgi_port_status").value,
-            server_uptime=variables.get("sys.server_uptime").value,
-            scgi_request_pending=variables.get("sys.scgi_request_pending").value,
-            scgi_request_count=variables.get("sys.scgi_request_count").value,
-            push_port_status=variables.get("sys.push_port_status").value,
-            push_count=variables.get("sys.push_count").value,
-            push_ack_errors=variables.get("sys.push_ack_errors").value,
-            push_list_count=variables.get("sys.push_list_count").value,
-            cache_request=variables.get("sys.cache_request").value,
-            cache_valid=variables.get("sys.cache_valid").value,
-            server_version=variables.get("sys.server_version").value,
-            udp_rx_count=variables.get("sys.udp_rx_count").value,
-            udp_tx_count=variables.get("sys.udp_tx_count").value,
-            datalogger_status=variables.get("sys.datalogger_status").value,
-        )
+        """generate ServerInfo object out of name / Var object dictionary
+
+        Args:
+            variables: Received data from SCGI server.
+
+        Returns:
+            ServerInfo data.
+
+        Raises:
+            CybroError: The Cybro scgi server returned no or incomlete Server info data.
+        """
+        try:
+            return ServerInfo(
+                scgi_port_status=variables.get("sys.scgi_port_status").value,
+                server_uptime=variables.get("sys.server_uptime").value,
+                scgi_request_pending=variables.get("sys.scgi_request_pending").value,
+                scgi_request_count=variables.get("sys.scgi_request_count").value,
+                push_port_status=variables.get("sys.push_port_status").value,
+                push_count=variables.get("sys.push_count").value,
+                push_ack_errors=variables.get("sys.push_ack_errors").value,
+                push_list_count=variables.get("sys.push_list_count").value,
+                cache_request=variables.get("sys.cache_request").value,
+                cache_valid=variables.get("sys.cache_valid").value,
+                server_version=variables.get("sys.server_version").value,
+                udp_rx_count=variables.get("sys.udp_rx_count").value,
+                udp_tx_count=variables.get("sys.udp_tx_count").value,
+                datalogger_status=variables.get("sys.datalogger_status").value,
+            )
+        except AttributeError:
+            raise CybroError(
+                "Not all ServerInfo tags found in data"
+            ) from AttributeError
 
 
 @dataclass
@@ -126,18 +154,34 @@ class PlcInfo:  # pylint:
 
     @staticmethod
     def from_dict(data: dict[str, Any], plc_nad: int) -> PlcInfo:
-        """generate PlcInfo object out of name / value dictionary"""
-        return PlcInfo(
-            nad=plc_nad,
-            ip_port=data["c" + str(plc_nad) + ".sys.ip_port"],
-            timestamp=data["c" + str(plc_nad) + ".sys.timestamp"],
-            plc_program_status=data["c" + str(plc_nad) + ".sys.plc_program_status"],
-            response_time=data["c" + str(plc_nad) + ".sys.response_time"],
-            bytes_transferred=data["c" + str(plc_nad) + ".sys.bytes_transferred"],
-            comm_error_count=data["c" + str(plc_nad) + ".sys.comm_error_count"],
-            alc_file=data["c" + str(plc_nad) + ".sys.alc_file"],
-            plc_vars={},
-        )
+        """generate PlcInfo object out of name / value dictionary
+
+        Args:
+            data: Received data from SCGI server.
+            plc_nad: Address of PLC
+
+        Returns:
+            PlcInfo data.
+
+        Raises:
+            CybroPlcNotFoundError: The Cybro scgi server returned no or incomlete PLC data.
+        """
+        try:
+            return PlcInfo(
+                nad=plc_nad,
+                ip_port=data["c" + str(plc_nad) + ".sys.ip_port"],
+                timestamp=data["c" + str(plc_nad) + ".sys.timestamp"],
+                plc_program_status=data["c" + str(plc_nad) + ".sys.plc_program_status"],
+                response_time=data["c" + str(plc_nad) + ".sys.response_time"],
+                bytes_transferred=data["c" + str(plc_nad) + ".sys.bytes_transferred"],
+                comm_error_count=data["c" + str(plc_nad) + ".sys.comm_error_count"],
+                alc_file=data["c" + str(plc_nad) + ".sys.alc_file"],
+                plc_vars={},
+            )
+        except KeyError:
+            raise CybroPlcNotFoundError(
+                "Not all ServerInfo tags found in data"
+            ) from KeyError
 
     @staticmethod
     def from_vars(variables: dict[str, Var], plc_nad: int) -> PlcInfo:
@@ -185,13 +229,15 @@ class PlcInfo:  # pylint:
         """Shall be called after update of PlcInfo to refresh list of all plc vars"""
         prefix = f"c{self.nad}."
         res: dict[str, str] = {}
+        if self.alc_file is None:
+            self.plc_vars = res
+            return res
         alc_lines = self.alc_file.splitlines()
         for line in alc_lines[2:]:
             typ = line[37:43].rstrip()
             name = line[43:-1].split()[0].rstrip()
             res[f"{prefix}{name}"] = typ
-            # print(f"{prefix}{name} = {typ}")
-        self.plc_vars = res
+            self.plc_vars = res
         return res
 
 
@@ -205,14 +251,11 @@ class Var:
     """value as string of variable"""
     description: str
     """description of the variable"""
-    # var_type: int
-    # """variable type"""
 
     def __init__(self, name: str, value: str, description: str) -> None:
         self.name = name
         self.value = value
         self.description = description
-        # self.var_type = var_type
 
     @staticmethod
     def from_dict(data: dict[str, Any]) -> Var:
@@ -221,7 +264,6 @@ class Var:
             name=data.get("name"),
             value=data.get("value"),
             description=data.get("description"),
-            # var_type=var_type,
         )
 
     def value_string(self) -> str:
@@ -266,10 +308,17 @@ class Device:
                 that a Device object cannot be constructed from it.
         """
         # Check if all elements are in the passed dict, else raise an Error
-        if data["var"] is None:
-            raise CybroError("Cybro data is incomplete, cannot construct device object")
-
-        self.update_from_dict(data, plc_nad=plc_nad)
+        try:
+            if "var" in data:
+                self.update_from_dict(data, plc_nad=plc_nad)
+            else:
+                raise CybroError(
+                    "Cybro data is incomplete, cannot construct device object"
+                )
+        except TypeError as exc:
+            raise CybroError(
+                "Cybro data is incomplete, cannot construct device object"
+            ) from exc
 
     def update_from_dict(self, data: dict, plc_nad: int = 0) -> Device:
         """Return Device object from Cybro scgi server response.
@@ -295,7 +344,7 @@ class Device:
 
         return self
 
-    def update_user_var_from_dict(self, data: dict) -> None:
+    def update_user_var_from_dict(self, data: dict) -> Device:
         """Parses user variables from Cybro scgi server response.
 
         Args:
@@ -303,15 +352,17 @@ class Device:
                 Cybro scgi server request.
 
         Returns:
-            None.
+            The updated Device object.
         """
         # update user variable
-        for _var in data["var"]:
-            if _var == "name":
-                self.vars.update({data["var"]["name"]: Var.from_dict(data)})
-            else:
-                self.vars.update({_var["name"]: Var.from_dict(_var)})
-
+        try:
+            for _var in data["var"]:
+                if _var == "name":
+                    self.vars.update({data["var"]["name"]: Var.from_dict(data)})
+                else:
+                    self.vars.update({_var["name"]: Var.from_dict(_var)})
+        except (KeyError, TypeError):
+            pass
         return self
 
     def update_var(self, data: dict, var_type: VarType = 0) -> str | bool | int | float:
@@ -325,17 +376,17 @@ class Device:
         Returns:
             The value of the var
         """
-        if len(data) == 1:
-            self.vars.update({data["var"]["name"]: Var.from_dict(data["var"])})
-            self.vars_types.update({data["var"]["name"]: var_type})
-            self.user_vars.update({data["var"]["name"]: ""})
-            return self.vars[data["var"]["name"]].value
-
-        for _var in data["var"]:
-            self.vars.update({_var["name"]: Var.from_dict(_var)})
-            self.vars_types.update({_var["name"]: var_type})
-            self.user_vars.update({_var["name"]: ""})
-            return self.vars[_var["name"]].value
+        try:
+            for _var in data["var"]:
+                if _var == "name":
+                    # single var entry found
+                    _var = data["var"]
+                self.vars.update({_var["name"]: Var.from_dict(_var)})
+                self.vars_types.update({_var["name"]: var_type})
+                self.user_vars.update({_var["name"]: ""})
+                return self.vars[_var["name"]].value
+        except (KeyError, TypeError):
+            pass
         return "?"
 
     def add_var(self, name: str, var_type: VarType = 0) -> None:
@@ -348,9 +399,12 @@ class Device:
         self.vars_types.update({name: var_type})
 
     def remove_var(self, name: str) -> None:
-        """Removes a variable from the read list"""
-        self.user_vars.pop(name)
-        self.vars_types.pop(name)
+        """Removes a variable from the read list.
+
+        Args:
+            name: Variable name to delete from user_vars"""
+        self.user_vars.pop(name, "")
+        self.vars_types.pop(name, "")
 
 
 class VarType(IntEnum):

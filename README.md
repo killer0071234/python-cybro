@@ -6,6 +6,7 @@
 
 [![pre-commit][pre-commit-shield]][pre-commit]
 [![Black][black-shield]][black]
+[![Code Coverage][codecov-shield]][codecov]
 
 [![Project Maintenance][maintenance-shield]][user_profile]
 
@@ -29,6 +30,8 @@ If you want to contribute to this please read the [Contribution guidelines](http
 [black-shield]: https://img.shields.io/badge/code%20style-black-000000.svg?style=for-the-badge
 [commits-shield]: https://img.shields.io/github/commit-activity/y/killer0071234/python-cybro.svg?style=for-the-badge
 [commits]: https://github.com/killer0071234/python-cybro/commits/main
+[codecov-shield]: https://img.shields.io/codecov/c/gh/killer0071234/python-cybro?style=for-the-badge&token=2VFGXXQ4N0
+[codecov]: https://codecov.io/gh/killer0071234/python-cybro
 [pre-commit]: https://github.com/pre-commit/pre-commit
 [pre-commit-shield]: https://img.shields.io/badge/pre--commit-enabled-brightgreen?style=for-the-badge
 [license-shield]: https://img.shields.io/github/license/killer0071234/python-cybro.svg?style=for-the-badge
