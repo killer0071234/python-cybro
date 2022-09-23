@@ -1,4 +1,4 @@
-aiohttp==3.8.1
+aiohttp==3.8.3
 async_timeout==4.0.2
 xmltodict==0.13.0
 pip==22.2.2
