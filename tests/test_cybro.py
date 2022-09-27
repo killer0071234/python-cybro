@@ -3,6 +3,8 @@ import unittest
 from typing import Any
 from unittest import IsolatedAsyncioTestCase
 
+from src.cybro.cybro import _add_hiq_tags
+from src.cybro.cybro import _get_chunk
 from src.cybro.exceptions import CybroError
 from src.cybro.exceptions import CybroPlcNotFoundError
 from src.cybro.models import Device
@@ -309,6 +311,37 @@ class TestCybro(IsolatedAsyncioTestCase):
         device.add_var("c1000.scan_time", 0)
         device.remove_var("c1000.scan_time")
         self.assertIsInstance(device, Device)
+
+    # def test_cybro_add_var(self) -> None:
+    #    """Test to add a var."""
+    #    _dev = Cybro("localhost", 4000, 1)
+    #    _dev.add_var("c1.test")
+    #    self.assertIsNotNone(_dev)
+
+    def test_cybro_get_chunk(self) -> None:
+        """Get a single chunk."""
+        _vars_check = {}
+        for dev in range(8):
+            _vars_check.update({f"c1.lc{dev:02.0f}_general_error": ""})
+        _chunk = _get_chunk(_vars_check, 50)
+        for chunk in _chunk:
+            self.assertCountEqual(_vars_check, chunk)
+
+    def test_cybro_add_hiq_tags(self) -> None:
+        """Check to add hiq-tags."""
+        _vars_check = {}
+        for dev in range(8):
+            _vars_check.update({f"c1.lc{dev:02.0f}_general_error": ""})
+        for dev in range(4):
+            _vars_check.update({f"c1.ld{dev:02.0f}_general_error": ""})
+            _vars_check.update({f"c1.sc{dev:02.0f}_general_error": ""})
+        for dev in range(6):
+            _vars_check.update({f"c1.bc{dev:02.0f}_general_error": ""})
+            _vars_check.update({f"c1.fc{dev:02.0f}_general_error": ""})
+            _vars_check.update({f"c1.th{dev:02.0f}_general_error": ""})
+        _vars = {}
+        _vars = _add_hiq_tags(_vars, "c1.")
+        self.assertCountEqual(_vars, _vars_check)
 
     # We patch 'aiohttp.client.ClientSession' with our own method. The mock object is passed in to our test case method.
     # @patch("aiohttp.client.ClientSession", spec=True)
