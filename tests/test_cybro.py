@@ -339,6 +339,7 @@ class TestCybro(IsolatedAsyncioTestCase):
             _vars_check.update({f"c1.bc{dev:02.0f}_general_error": ""})
             _vars_check.update({f"c1.fc{dev:02.0f}_general_error": ""})
             _vars_check.update({f"c1.th{dev:02.0f}_general_error": ""})
+        _vars_check.update({"c1.power_meter_error": ""})
         _vars = {}
         _vars = _add_hiq_tags(_vars, "c1.")
         self.assertCountEqual(_vars, _vars_check)
