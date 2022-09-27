@@ -388,4 +388,5 @@ def _add_hiq_tags(
     _vars[controller + "fc03_general_error"] = ""
     _vars[controller + "fc04_general_error"] = ""
     _vars[controller + "fc05_general_error"] = ""
+    _vars[controller + "power_meter_error"] = ""
     return _vars
