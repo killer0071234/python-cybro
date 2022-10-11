@@ -63,7 +63,7 @@ safety = "^2.3.1"
 codespell = "^2.1.0"
 bandit = "^1.7.0"
 types-cachetools = "^5.2.1"
-reorder-python-imports = "^3.8.3"
+reorder-python-imports = "^3.8.4"
 
 [tool.poetry.urls]
 "Bug Tracker" = "https://github.com/killer0071234/python-cybro/issues"
