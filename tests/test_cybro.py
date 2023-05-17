@@ -334,6 +334,8 @@ class TestCybro(IsolatedAsyncioTestCase):
             _vars_check.update({f"c1.lc{dev:02.0f}_general_error": ""})
         for dev in range(4):
             _vars_check.update({f"c1.ld{dev:02.0f}_general_error": ""})
+            _vars_check.update({f"c1.ld{dev:02.0f}_rgb_mode": ""})
+            _vars_check.update({f"c1.ld{dev:02.0f}_rgb_mode_2": ""})
             _vars_check.update({f"c1.sc{dev:02.0f}_general_error": ""})
         for dev in range(6):
             _vars_check.update({f"c1.bc{dev:02.0f}_general_error": ""})
