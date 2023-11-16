@@ -1600,13 +1600,13 @@ testing = ["coverage (>=6.2)", "coverage-enable-subprocess (>=1)", "flaky (>=3.7
 
 [[package]]
 name = "vulture"
-version = "2.6"
+version = "2.10"
 description = "Find dead code"
 optional = false
-python-versions = ">=3.6"
+python-versions = ">=3.8"
 files = [
-    {file = "vulture-2.6-py2.py3-none-any.whl", hash = "sha256:e792e903ccc063ec4873a8979dcf11b51ea3d65a2d3b31c113d47be48f0cdcae"},
-    {file = "vulture-2.6.tar.gz", hash = "sha256:2515fa848181001dc8a73aba6a01a1a17406f5d372f24ec7f7191866f9f4997e"},
+    {file = "vulture-2.10-py2.py3-none-any.whl", hash = "sha256:568a4176db7468d0157817ae3bb1847a19f1ddc629849af487f9d3b279bff77d"},
+    {file = "vulture-2.10.tar.gz", hash = "sha256:2a5c3160bffba77595b6e6dfcc412016bd2a09cd4b66cdf7fbba913684899f6f"},
 ]
 
 [package.dependencies]
@@ -1797,4 +1797,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.8"
-content-hash = "4e1f5dd39bfa489cea7462ce8c7d272185cc9e853ab2d2a33b0d02baa2d5a39f"
+content-hash = "63961d471a12f6d187d0bf73d795b51336dbfc5a74797d3474a7cba6cc1edf51"
