@@ -10,8 +10,8 @@ async def main():
     """Show example on controlling a Cybro PLC."""
     nad = 10000
     prefix = f"c{nad}."
-    async with Cybro("192.168.10.62", 4000, nad) as cybro:
-        device = await cybro.update()
+    async with Cybro("192.168.10.48", 4000, nad) as cybro:
+        device = await cybro.update(device_type=1)
         print("server_version -> " + device.server_info.server_version)
         print("ip_port -> " + device.plc_info.ip_port)
         print("timestamp -> " + device.plc_info.timestamp)
