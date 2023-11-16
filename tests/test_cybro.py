@@ -332,16 +332,26 @@ class TestCybro(IsolatedAsyncioTestCase):
         _vars_check = {}
         for dev in range(8):
             _vars_check.update({f"c1.lc{dev:02.0f}_general_error": ""})
-        for dev in range(4):
+        for dev in range(10):
             _vars_check.update({f"c1.ld{dev:02.0f}_general_error": ""})
             _vars_check.update({f"c1.ld{dev:02.0f}_rgb_mode": ""})
             _vars_check.update({f"c1.ld{dev:02.0f}_rgb_mode_2": ""})
+        for dev in range(4):
             _vars_check.update({f"c1.sc{dev:02.0f}_general_error": ""})
         for dev in range(6):
             _vars_check.update({f"c1.bc{dev:02.0f}_general_error": ""})
             _vars_check.update({f"c1.fc{dev:02.0f}_general_error": ""})
+        for dev in range(10):
             _vars_check.update({f"c1.th{dev:02.0f}_general_error": ""})
+            _vars_check.update({f"c1.th{dev:02.0f}_window_enable": ""})
+            _vars_check.update({f"c1.th{dev:02.0f}_fan_limit": ""})
+            _vars_check.update({f"c1.th{dev:02.0f}_demand_enable": ""})
         _vars_check.update({"c1.power_meter_error": ""})
+        _vars_check.update({"c1.outdoor_temperature_enable": ""})
+        _vars_check.update({"c1.wall_temperature_enable": ""})
+        _vars_check.update({"c1.water_temperature_enable": ""})
+        _vars_check.update({"c1.auxilary_temperature_enable": ""})
+        _vars_check.update({"c1.hvac_mode": ""})
         _vars = {}
         _vars = _add_hiq_tags(_vars, "c1.")
         self.assertCountEqual(_vars, _vars_check)
