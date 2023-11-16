@@ -222,13 +222,19 @@ class Cybro:
                 if device_type == 1:
                     _vars = _add_hiq_tags(_vars, _controller)
 
-            if not (data := await self.request(data=_vars)):
-                raise CybroEmptyResponseError(
-                    f"Cybro scgi server at {self.host}:{self.port} returned an empty API"
-                    " response on full update"
-                )
-
-            self._device = Device(data, plc_nad=self.nad)
+            _sys_vars = _get_chunk(_vars, VAR_CHUNK_SIZE)
+            for _vars in _sys_vars:
+                if not (data1 := await self.request(data=_vars)):
+                    raise CybroEmptyResponseError(
+                        f"Cybro scgi server at {self.host}:{self.port} returned an empty API"
+                        " response on full update"
+                    )
+                # Update device info in chunks,
+                # but the first block must include all sys variables
+                if self._device is None:
+                    self._device = Device(data1, plc_nad=self.nad)
+                else:
+                    self._device.update_from_dict(data1)
 
             if len(self._device.user_vars) > 0:
                 _user_vars = _get_chunk(self._device.user_vars, VAR_CHUNK_SIZE)
