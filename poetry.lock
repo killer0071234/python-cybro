@@ -1327,13 +1327,13 @@ files = [
 
 [[package]]
 name = "reorder-python-imports"
-version = "3.8.5"
+version = "3.12.0"
 description = "Tool for reordering python imports"
 optional = false
-python-versions = ">=3.7"
+python-versions = ">=3.8"
 files = [
-    {file = "reorder_python_imports-3.8.5-py2.py3-none-any.whl", hash = "sha256:6c36b84add1a8125479e1de97a21b7797ee6df51530b5340857d65c79d6882ac"},
-    {file = "reorder_python_imports-3.8.5.tar.gz", hash = "sha256:5e018dceb889688eafd41a1b217420f810e0400f5a26c679a08f7f9de956ca3b"},
+    {file = "reorder_python_imports-3.12.0-py2.py3-none-any.whl", hash = "sha256:930c23a42192b365e20e191a4d304d93e645bd44c242d8bc64accc4a3b2b0f3d"},
+    {file = "reorder_python_imports-3.12.0.tar.gz", hash = "sha256:f93106a662b0c034ca81c91fd1c2f21a1e94ece47c9f192672e2a13c8ec1856c"},
 ]
 
 [package.dependencies]
@@ -1731,4 +1731,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.8"
-content-hash = "41ed5dfe5479d8bd9761e8135ec78588444831d92b74e9f2432c2524a12c81da"
+content-hash = "fb8c42a50e3eacf8fbaf110c6a4d7e5477a6a6621a0541d2e033a110c7b659c3"
