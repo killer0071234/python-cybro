@@ -35,7 +35,7 @@ xmltodict = "^0.13.0"
 
 [tool.poetry.dev-dependencies]
 aresponses = "^2.1.6"
-black = "^22.10"
+black = "^22.12"
 blacken-docs = "^1.16.0"
 coverage = {version = "^7.3", extras = ["toml"]}
 flake8 = "^4.0.1"
