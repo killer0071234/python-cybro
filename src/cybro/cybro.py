@@ -348,13 +348,18 @@ def _get_chunk(data, chunk_size):
 
 
 def _add_hiq_tags(
-    variables: dict[str, str], controller: str = "c10000."
+    variables: dict[str, str],
+    controller: str = "c10000.",
+    add_card_id: bool = False,
+    add_fw_ver: bool = False,
 ) -> dict[str, str]:
     """Adds controller specific general error tags.
 
     Args:
         variables: current list of variables to add to it
         controller: controller prefix (Default: c10000.)
+        add_card_id: append iex_card_id for HIQ expansion units
+        add_fw_ver: append firmware_version for HIQ expansion units
 
     Returns:
         An updated dictionary of variables that includes HIQ controller specific variables.
@@ -460,4 +465,95 @@ def _add_hiq_tags(
     _vars[controller + "water_temperature_enable"] = ""
     _vars[controller + "auxilary_temperature_enable"] = ""
     _vars[controller + "hvac_mode"] = ""
+    if add_card_id:
+        _vars[controller + "lc00_iex_card_id"] = ""
+        _vars[controller + "lc01_iex_card_id"] = ""
+        _vars[controller + "lc02_iex_card_id"] = ""
+        _vars[controller + "lc03_iex_card_id"] = ""
+        _vars[controller + "lc04_iex_card_id"] = ""
+        _vars[controller + "lc05_iex_card_id"] = ""
+        _vars[controller + "lc06_iex_card_id"] = ""
+        _vars[controller + "lc07_iex_card_id"] = ""
+        _vars[controller + "ld00_iex_card_id"] = ""
+        _vars[controller + "ld01_iex_card_id"] = ""
+        _vars[controller + "ld02_iex_card_id"] = ""
+        _vars[controller + "ld03_iex_card_id"] = ""
+        _vars[controller + "ld04_iex_card_id"] = ""
+        _vars[controller + "ld05_iex_card_id"] = ""
+        _vars[controller + "ld06_iex_card_id"] = ""
+        _vars[controller + "ld07_iex_card_id"] = ""
+        _vars[controller + "ld08_iex_card_id"] = ""
+        _vars[controller + "ld09_iex_card_id"] = ""
+        _vars[controller + "bc00_iex_card_id"] = ""
+        _vars[controller + "bc01_iex_card_id"] = ""
+        _vars[controller + "bc02_iex_card_id"] = ""
+        _vars[controller + "bc03_iex_card_id"] = ""
+        _vars[controller + "bc04_iex_card_id"] = ""
+        _vars[controller + "bc05_iex_card_id"] = ""
+        _vars[controller + "sc00_iex_card_id"] = ""
+        _vars[controller + "sc01_iex_card_id"] = ""
+        _vars[controller + "sc02_iex_card_id"] = ""
+        _vars[controller + "sc03_iex_card_id"] = ""
+        _vars[controller + "th00_iex_card_id"] = ""
+        _vars[controller + "th01_iex_card_id"] = ""
+        _vars[controller + "th02_iex_card_id"] = ""
+        _vars[controller + "th03_iex_card_id"] = ""
+        _vars[controller + "th04_iex_card_id"] = ""
+        _vars[controller + "th05_iex_card_id"] = ""
+        _vars[controller + "th06_iex_card_id"] = ""
+        _vars[controller + "th07_iex_card_id"] = ""
+        _vars[controller + "th08_iex_card_id"] = ""
+        _vars[controller + "th09_iex_card_id"] = ""
+        _vars[controller + "fc00_iex_card_id"] = ""
+        _vars[controller + "fc01_iex_card_id"] = ""
+        _vars[controller + "fc02_iex_card_id"] = ""
+        _vars[controller + "fc03_iex_card_id"] = ""
+        _vars[controller + "fc04_iex_card_id"] = ""
+        _vars[controller + "fc05_iex_card_id"] = ""
+    if add_fw_ver:
+        _vars[controller + "lc00_firmware_version"] = ""
+        _vars[controller + "lc01_firmware_version"] = ""
+        _vars[controller + "lc02_firmware_version"] = ""
+        _vars[controller + "lc03_firmware_version"] = ""
+        _vars[controller + "lc04_firmware_version"] = ""
+        _vars[controller + "lc05_firmware_version"] = ""
+        _vars[controller + "lc06_firmware_version"] = ""
+        _vars[controller + "lc07_firmware_version"] = ""
+        _vars[controller + "ld00_firmware_version"] = ""
+        _vars[controller + "ld01_firmware_version"] = ""
+        _vars[controller + "ld02_firmware_version"] = ""
+        _vars[controller + "ld03_firmware_version"] = ""
+        _vars[controller + "ld04_firmware_version"] = ""
+        _vars[controller + "ld05_firmware_version"] = ""
+        _vars[controller + "ld06_firmware_version"] = ""
+        _vars[controller + "ld07_firmware_version"] = ""
+        _vars[controller + "ld08_firmware_version"] = ""
+        _vars[controller + "ld09_firmware_version"] = ""
+        _vars[controller + "bc00_firmware_version"] = ""
+        _vars[controller + "bc01_firmware_version"] = ""
+        _vars[controller + "bc02_firmware_version"] = ""
+        _vars[controller + "bc03_firmware_version"] = ""
+        _vars[controller + "bc04_firmware_version"] = ""
+        _vars[controller + "bc05_firmware_version"] = ""
+        _vars[controller + "sc00_firmware_version"] = ""
+        _vars[controller + "sc01_firmware_version"] = ""
+        _vars[controller + "sc02_firmware_version"] = ""
+        _vars[controller + "sc03_firmware_version"] = ""
+        _vars[controller + "th00_firmware_version"] = ""
+        _vars[controller + "th01_firmware_version"] = ""
+        _vars[controller + "th02_firmware_version"] = ""
+        _vars[controller + "th03_firmware_version"] = ""
+        _vars[controller + "th04_firmware_version"] = ""
+        _vars[controller + "th05_firmware_version"] = ""
+        _vars[controller + "th06_firmware_version"] = ""
+        _vars[controller + "th07_firmware_version"] = ""
+        _vars[controller + "th08_firmware_version"] = ""
+        _vars[controller + "th09_firmware_version"] = ""
+        _vars[controller + "fc00_firmware_version"] = ""
+        _vars[controller + "fc01_firmware_version"] = ""
+        _vars[controller + "fc02_firmware_version"] = ""
+        _vars[controller + "fc03_firmware_version"] = ""
+        _vars[controller + "fc04_firmware_version"] = ""
+        _vars[controller + "fc05_firmware_version"] = ""
+
     return _vars
