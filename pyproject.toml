@@ -61,7 +61,7 @@ flake8-markdown = "^0.3.0"
 darglint = "^1.8.1"
 safety = "^2.3.5"
 codespell = "^2.2.6"
-bandit = "^1.7.5"
+bandit = "^1.7.6"
 types-cachetools = "^5.3.0"
 reorder-python-imports = "^3.12.0"
 
