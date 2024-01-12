@@ -37,7 +37,7 @@ cachetools = ">=5.0.0"
 xmltodict = "^0.13.0"
 
 [tool.poetry.dev-dependencies]
-aresponses = "^2.1.6"
+aresponses = "^3.0.0"
 black = "^22.12"
 blacken-docs = "^1.16.0"
 coverage = {version = "^7.4", extras = ["toml"]}
