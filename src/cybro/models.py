@@ -1,4 +1,4 @@
-"""Models for Cybro scgi server objects."""
+"""Models for Cybro scgi server objects."""  # fmt: skip
 from __future__ import annotations
 
 from dataclasses import dataclass
