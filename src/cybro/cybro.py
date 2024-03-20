@@ -1,4 +1,4 @@
-"""Asynchronous Python client for Cybro scgi server."""
+"""Asynchronous Python client for Cybro scgi server."""  # fmt: skip
 from __future__ import annotations
 
 import asyncio

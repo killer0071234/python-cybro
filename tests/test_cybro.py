@@ -1,4 +1,4 @@
-"""Tests for `cybro.Cybro`."""
+"""Tests for `cybro.Cybro`."""  # fmt: skip
 import unittest
 from typing import Any
 from unittest import IsolatedAsyncioTestCase

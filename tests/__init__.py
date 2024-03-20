@@ -1,4 +1,4 @@
-"""Asynchronous Python client for Cybro."""
+"""Asynchronous Python client for Cybro."""  # fmt: skip
 import sys
 
 sys.path.append(".")
