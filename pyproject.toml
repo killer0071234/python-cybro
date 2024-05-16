@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "cybro"
-version = "0.1.3"
+version = "0.2.0"
 description = "Asynchronous Python client for Cybro scgi server."
 authors = ["Daniel Gangl <killer007@gmx.at>"]
 maintainers = ["Daniel Gangl <killer007@gmx.at>"]

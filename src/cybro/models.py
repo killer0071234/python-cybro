@@ -389,14 +389,18 @@ class Device:
             pass
         return "?"
 
-    def add_var(self, name: str, var_type: VarType = 0) -> None:
+    def add_var(
+        self, name: str, var_type: VarType = 0, allow_all: bool = False
+    ) -> None:
         """Adds a variable to the update list.
 
         Args:
             name: Variable name to read eg: c1000.scan_time
-            var_type: Optionally defines a Varaibe Type"""
-        self.user_vars.update({name: ""})
-        self.vars_types.update({name: var_type})
+            var_type: Optionally defines a Variable Type
+            allow_all: Optionally allow to add also non existing variables"""
+        if allow_all or name in self.plc_info.plc_vars or name.find(".sys.") != -1:
+            self.user_vars.update({name: ""})
+            self.vars_types.update({name: var_type})
 
     def remove_var(self, name: str) -> None:
         """Removes a variable from the read list.

@@ -316,9 +316,12 @@ class Cybro:
         """Read a single variable from scgi server as float."""
         return await self.read_var(name, VarType.BOOL)
 
-    def add_var(self, name: str) -> None:
-        """Add a variable into update buffer."""
-        self._device.add_var(name)
+    def add_var(self, name: str, allow_all: bool = False) -> None:
+        """Add a variable into update buffer.
+
+        name: Variable name to read eg: c1000.scan_time
+        allow_all: Optionally allow to add also non existing variables"""
+        self._device.add_var(name, allow_all=allow_all)
 
     def remove_var(self, name: str) -> None:
         """Remove a variable from update buffer."""
