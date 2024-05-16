@@ -1,4 +1,4 @@
-aiohttp==3.9.1
+aiohttp==3.9.5
 async-timeout==4.0.3
 yarl==1.9.4
 xmltodict==0.13.0
