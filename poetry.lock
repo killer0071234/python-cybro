@@ -747,19 +747,19 @@ test = ["pytest (>=6)"]
 
 [[package]]
 name = "filelock"
-version = "3.13.1"
+version = "3.12.4"
 description = "A platform independent file lock."
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "filelock-3.13.1-py3-none-any.whl", hash = "sha256:57dbda9b35157b05fb3e58ee91448612eb674172fab98ee235ccb0b5bee19a1c"},
-    {file = "filelock-3.13.1.tar.gz", hash = "sha256:521f5f56c50f8426f5e03ad3b281b490a87ef15bc6c526f168290f0c7148d44e"},
+    {file = "filelock-3.12.4-py3-none-any.whl", hash = "sha256:08c21d87ded6e2b9da6728c3dff51baf1dcecf973b768ef35bcbc3447edb9ad4"},
+    {file = "filelock-3.12.4.tar.gz", hash = "sha256:2e6f249f1f3654291606e046b09f1fd5eac39b360664c27f5aad072012f8bcbd"},
 ]
 
 [package.extras]
-docs = ["furo (>=2023.9.10)", "sphinx (>=7.2.6)", "sphinx-autodoc-typehints (>=1.24)"]
-testing = ["covdefaults (>=2.3)", "coverage (>=7.3.2)", "diff-cover (>=8)", "pytest (>=7.4.3)", "pytest-cov (>=4.1)", "pytest-mock (>=3.12)", "pytest-timeout (>=2.2)"]
-typing = ["typing-extensions (>=4.8)"]
+docs = ["furo (>=2023.7.26)", "sphinx (>=7.1.2)", "sphinx-autodoc-typehints (>=1.24)"]
+testing = ["covdefaults (>=2.3)", "coverage (>=7.3)", "diff-cover (>=7.7)", "pytest (>=7.4)", "pytest-cov (>=4.1)", "pytest-mock (>=3.11.1)", "pytest-timeout (>=2.1)"]
+typing = ["typing-extensions (>=4.7.1)"]
 
 [[package]]
 name = "flake8"
@@ -1867,27 +1867,28 @@ files = [
 
 [[package]]
 name = "safety"
-version = "3.0.1"
+version = "3.2.4"
 description = "Checks installed dependencies for known vulnerabilities and licenses."
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "safety-3.0.1-py3-none-any.whl", hash = "sha256:1ed058bc4bef132b974e58d7fcad020fb897cd255328016f8a5a194b94ca91d2"},
-    {file = "safety-3.0.1.tar.gz", hash = "sha256:1f2000f03652f3a0bfc67f8fd1e98bc5723ccb76e15cb1bdd68545c3d803df01"},
+    {file = "safety-3.2.4-py3-none-any.whl", hash = "sha256:242ff7ae448d7fb2ea455c90f44e3f2ca45be9c8559b2fe9dfc89617164a0f17"},
+    {file = "safety-3.2.4.tar.gz", hash = "sha256:bac0202016d736a2118057964a0e3983fa20ff2563fd103cac3f3ac1ed3fea11"},
 ]
 
 [package.dependencies]
 Authlib = ">=1.2.0"
 Click = ">=8.0.2"
 dparse = ">=0.6.4b0"
+filelock = ">=3.12.2,<3.13.0"
 jinja2 = ">=3.1.0"
 marshmallow = ">=3.15.0"
 packaging = ">=21.0"
-pydantic = ">=1.10.12,<2.0"
+pydantic = ">=1.10.12"
 requests = "*"
 rich = "*"
 "ruamel.yaml" = ">=0.17.21"
-safety-schemas = ">=0.0.1"
+safety-schemas = ">=0.0.2"
 setuptools = ">=65.5.1"
 typer = "*"
 typing-extensions = ">=4.7.1"
@@ -2218,4 +2219,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.8"
-content-hash = "6fdaf3d89b87ce52ffa9380efdab0fce83a06ca3646e91f7fd117582261321c9"
+content-hash = "f60996ed7ba229effa6efa1e7890720d505b87c77f6acb84a1bd62d1161c8c34"
