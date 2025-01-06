@@ -13,13 +13,8 @@ from .exceptions import CybroPlcNotFoundError
 class ServerInfo:  # pylint:
     """Cybro scgi server information."""
 
-    scgi_port_status: str
-    """- no response, server is down
-    - "active", server is up and running"""
     server_uptime: str
     """server uptime, returned as "dd days, hh:mm:ss"""
-    scgi_request_pending: int
-    """number of requests waiting to be served"""
     scgi_request_count: int
     """total number of requests served since server is started"""
     push_port_status: str
@@ -42,16 +37,11 @@ class ServerInfo:  # pylint:
     """total number of messages received through UDP proxy"""
     udp_tx_count: int
     """total number of messages transmitted through UDP proxy"""
-    datalogger_status: str
-    """- "active", process running
-    - "stopped", process stopped"""
-    nad_list: str = ""
-    """list of controllers in push list"""
+    nad_list: list[str]
+    """active controllers, including static, push and autodetect"""
     push_list: str = ""
-    """list of controllers with status
+    """list of controllers in push list
     (nad, ip:port, plc status, plc program, alc file, resp time)"""
-    abus_list: str = ""
-    """status of communication between server and controllers"""
     datalogger_list: str = ""
     """list of variables for sample and alarm"""
     proxy_activity_list: str = ""
@@ -72,9 +62,7 @@ class ServerInfo:  # pylint:
         """
         try:
             return ServerInfo(
-                scgi_port_status=data["sys.scgi_port_status"],
                 server_uptime=data["sys.server_uptime"],
-                scgi_request_pending=data["sys.scgi_request_pending"],
                 scgi_request_count=data["sys.scgi_request_count"],
                 push_port_status=data["sys.push_port_status"],
                 push_count=data["sys.push_count"],
@@ -85,7 +73,7 @@ class ServerInfo:  # pylint:
                 server_version=data["sys.server_version"],
                 udp_rx_count=data["sys.udp_rx_count"],
                 udp_tx_count=data["sys.udp_tx_count"],
-                datalogger_status=data["sys.datalogger_status"],
+                nad_list=data["sys.nad_list"].get("item"),
             )
         except KeyError:
             raise CybroError("Not all ServerInfo tags found in data") from KeyError
@@ -105,9 +93,7 @@ class ServerInfo:  # pylint:
         """
         try:
             return ServerInfo(
-                scgi_port_status=variables.get("sys.scgi_port_status").value,
                 server_uptime=variables.get("sys.server_uptime").value,
-                scgi_request_pending=variables.get("sys.scgi_request_pending").value,
                 scgi_request_count=variables.get("sys.scgi_request_count").value,
                 push_port_status=variables.get("sys.push_port_status").value,
                 push_count=variables.get("sys.push_count").value,
@@ -118,7 +104,7 @@ class ServerInfo:  # pylint:
                 server_version=variables.get("sys.server_version").value,
                 udp_rx_count=variables.get("sys.udp_rx_count").value,
                 udp_tx_count=variables.get("sys.udp_tx_count").value,
-                datalogger_status=variables.get("sys.datalogger_status").value,
+                nad_list=variables.get("sys.nad_list").value.get("item"),
             )
         except AttributeError:
             raise CybroError(
@@ -136,16 +122,17 @@ class PlcInfo:  # pylint:
     """ip address and port, returned as "xxx.xxx.xxx.xxx:yyyy" """
     timestamp: str
     """time and date when the program is sent to controller"""
-    plc_program_status: str
-    """- "?", status unknown
-    - "-", no communication, controller is offline
-    - "missing", controller has no plc program
-    - "ok", controller is up and running"""
+    plc_status: str
+    """- "ok", controller is running
+    - "pgm missing", controller has no plc program
+    - "alc missing", controller has no alc file
+    - "offline", controller does not respond
+    - "?", status of the controller is unknown"""
     response_time: str
     """number of milliseconds elapsed between request and response"""
     bytes_transferred: int
     """number of bytes, read and write, transferred between server and controller"""
-    comm_error_count: int
+    com_error_count: int
     """total number of communication errors encountered by controller"""
     alc_file: str
     """allocation file, directly from the Cybro file system"""
@@ -171,10 +158,10 @@ class PlcInfo:  # pylint:
                 nad=plc_nad,
                 ip_port=data["c" + str(plc_nad) + ".sys.ip_port"],
                 timestamp=data["c" + str(plc_nad) + ".sys.timestamp"],
-                plc_program_status=data["c" + str(plc_nad) + ".sys.plc_program_status"],
+                plc_status=data["c" + str(plc_nad) + ".sys.plc_status"],
                 response_time=data["c" + str(plc_nad) + ".sys.response_time"],
                 bytes_transferred=data["c" + str(plc_nad) + ".sys.bytes_transferred"],
-                comm_error_count=data["c" + str(plc_nad) + ".sys.comm_error_count"],
+                com_error_count=data["c" + str(plc_nad) + ".sys.com_error_count"],
                 alc_file=data["c" + str(plc_nad) + ".sys.alc_file"],
                 plc_vars={},
             )
@@ -205,8 +192,8 @@ class PlcInfo:  # pylint:
                 timestamp=variables.get(
                     "c" + str(plc_nad) + ".sys.timestamp", ""
                 ).value,
-                plc_program_status=variables.get(
-                    "c" + str(plc_nad) + ".sys.plc_program_status", ""
+                plc_status=variables.get(
+                    "c" + str(plc_nad) + ".sys.plc_status", ""
                 ).value,
                 response_time=variables.get(
                     "c" + str(plc_nad) + ".sys.response_time", ""
@@ -214,8 +201,8 @@ class PlcInfo:  # pylint:
                 bytes_transferred=variables.get(
                     "c" + str(plc_nad) + ".sys.bytes_transferred", ""
                 ).value,
-                comm_error_count=variables.get(
-                    "c" + str(plc_nad) + ".sys.comm_error_count", ""
+                com_error_count=variables.get(
+                    "c" + str(plc_nad) + ".sys.com_error_count", ""
                 ).value,
                 alc_file=variables.get("c" + str(plc_nad) + ".sys.alc_file", "").value,
                 plc_vars={},

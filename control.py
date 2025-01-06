@@ -10,17 +10,17 @@ async def main():
     """Show example on controlling a Cybro PLC."""
     nad = 10000
     prefix = f"c{nad}."
-    async with Cybro("192.168.10.48", 4000, nad) as cybro:
+    async with Cybro("192.168.10.222", 4000, nad) as cybro:
         device = await cybro.update(device_type=1)
         print("server_version -> " + device.server_info.server_version)
+        print("nad_list -> " + str(device.server_info.nad_list))
         print("ip_port -> " + device.plc_info.ip_port)
         print("timestamp -> " + device.plc_info.timestamp)
-        print("plc_program_status -> " + device.plc_info.plc_program_status)
+        print("plc_status -> " + device.plc_info.plc_status)
         print("response_time -> " + device.plc_info.response_time)
         print("bytes_transferred -> " + device.plc_info.bytes_transferred)
-        print("comm_error_count -> " + device.plc_info.comm_error_count)
+        print("com_error_count -> " + device.plc_info.com_error_count)
         # print("alc_file -> " + device.plc_info.alc_file)
-        # print(device.plc_info.plc_vars["c12762.lc00_qx00"])
 
         device.add_var(f"{prefix}scan_overrun", VarType.BOOL)
         device.add_var(f"{prefix}retentive_fail", VarType.BOOL)
@@ -54,10 +54,9 @@ async def main():
         device.add_var(f"{prefix}scan_time_max", VarType.INT)
         device.add_var(f"{prefix}sys.ip_port")
         device.add_var(f"{prefix}sys.timestamp")
-        device.add_var(f"{prefix}sys.plc_program_status")
         device.add_var(f"{prefix}sys.response_time", VarType.INT)
         device.add_var(f"{prefix}sys.bytes_transferred", VarType.INT)
-        device.add_var(f"{prefix}sys.comm_error_count", VarType.INT)
+        device.add_var(f"{prefix}sys.com_error_count", VarType.INT)
         await cybro.update()
         for var in device.user_vars:
             print(var + " -> " + device.vars[var].value)

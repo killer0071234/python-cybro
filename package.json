@@ -1,8 +1,8 @@
 {
   "name": "cybro",
-  "version": "0.0.8",
+  "version": "0.1.0",
   "private": true,
-  "description": "Asynchronous Python client for Cybro Scgi Server",
+  "description": "Asynchronous Python client for Cybro Scgi Server v3.2.6 upwards",
   "scripts": {
     "pyright": "pyright",
     "prettier": "prettier --write **/*.{json,js,md,yml,yaml} *.{json,js,md,yml,yaml}"

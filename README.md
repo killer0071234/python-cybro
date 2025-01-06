@@ -18,7 +18,7 @@ Further information of the docker container can be found here: [![dockerhub][scg
 
 ## Tested scgi server
 
-- Cybrotech scgi server v3.1.3
+- Cybrotech scgi server v3.2.6 (previous versions are not supported)
 
 ## Contributions are welcome!
 
