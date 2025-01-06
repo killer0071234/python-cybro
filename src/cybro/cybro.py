@@ -189,11 +189,10 @@ class Cybro:
             CybroEmptyResponseError: The Cybro scgi server returned an empty response.
         """
         if self._device is None or full_update:
+            _data = []
             # read all relevant server vars
             _vars: dict[str, str] = {
-                "sys.scgi_port_status": "",
                 "sys.server_uptime": "",
-                "sys.scgi_request_pending": "",
                 "sys.scgi_request_count": "",
                 "sys.push_port_status": "",
                 "sys.push_count": "",
@@ -204,7 +203,7 @@ class Cybro:
                 "sys.server_version": "",
                 "sys.udp_rx_count": "",
                 "sys.udp_tx_count": "",
-                "sys.datalogger_status": "",
+                "sys.nad_list": "",
             }
             if plc_nad != 0 and self.nad == 0:
                 self.nad = plc_nad
@@ -213,15 +212,17 @@ class Cybro:
                 _controller = "c" + str(self.nad) + "."
                 _vars[_controller + "sys.ip_port"] = ""
                 _vars[_controller + "sys.timestamp"] = ""
-                _vars[_controller + "sys.plc_program_status"] = ""
+                _vars[_controller + "sys.plc_status"] = ""
                 _vars[_controller + "sys.response_time"] = ""
                 _vars[_controller + "sys.bytes_transferred"] = ""
-                _vars[_controller + "sys.comm_error_count"] = ""
+                _vars[_controller + "sys.com_error_count"] = ""
                 _vars[_controller + "sys.alc_file"] = ""
+                _vars[_controller + "sys.variables"] = ""
                 # read / prepare specific vars for HIQ-controller
                 if device_type == 1:
                     _vars = _add_hiq_tags(_vars, _controller)
 
+            # Update system info in chunks
             _sys_vars = _get_chunk(_vars, VAR_CHUNK_SIZE)
             for _vars in _sys_vars:
                 if not (data1 := await self.request(data=_vars)):
@@ -229,12 +230,15 @@ class Cybro:
                         f"Cybro scgi server at {self.host}:{self.port} returned an empty API"
                         " response on full update"
                     )
-                # Update device info in chunks,
-                # but the first block must include all sys variables
-                if self._device is None:
-                    self._device = Device(data1, plc_nad=self.nad)
-                else:
-                    self._device.update_from_dict(data1)
+                for var in data1["var"]:
+                    _data.append(var)
+
+            # combine all data into "var" dictionary
+            _data1 = {"var": _data}
+            if self._device is None:
+                self._device = Device(_data1, plc_nad=self.nad)
+            else:
+                self._device.update_from_dict(_data1)
 
             if len(self._device.user_vars) > 0:
                 _user_vars = _get_chunk(self._device.user_vars, VAR_CHUNK_SIZE)
