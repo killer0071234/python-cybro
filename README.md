@@ -18,7 +18,8 @@ Use it to read and write variables of Cybro / HIQ PLCs through the scgi server's
 ## Requirements
 
 - Python 3.11 or newer
-- A running Cybrotech scgi server **v3.2.6** (earlier versions are not supported).
+- A running Cybrotech scgi server **v3.2.6 or newer** (tested with v3.2.6 and v3.3.1;
+  earlier versions are not supported).
   You can install the server natively, or run it as a Docker container:
   [![dockerhub][scgi-docker-shield]][scgi-docker]
 

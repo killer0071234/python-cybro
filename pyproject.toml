@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "cybro"
-version = "0.3.1"
-description = "Asynchronous Python client for Cybro scgi server v3.2.6."
+version = "0.4.0"
+description = "Asynchronous Python client for the Cybro scgi server (v3.2.6 and newer)."
 authors = ["Daniel Gangl <killer007@gmx.at>"]
 maintainers = ["Daniel Gangl <killer007@gmx.at>"]
 license = "MIT"
@@ -32,7 +32,7 @@ aiohttp = ">=3.8.0"
 yarl = ">=1.7.2"
 backoff = ">=1.11.0"
 cachetools = ">=5.0.0"
-xmltodict = "^0.13.0"
+xmltodict = ">=0.13.0"
 
 [tool.poetry.group.dev.dependencies]
 aresponses = "^3.0.0"
