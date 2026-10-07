@@ -76,11 +76,13 @@ class FakeScgiServer:
         self.values = dict(SERVER_VALUES)
         self.nad_list = [NAD] if nad_list is None else nad_list
         self.queries: list[dict[str, str]] = []
+        self.raw_queries: list[str] = []
 
     async def handler(self, request: web.Request) -> web.Response:
         """Read or write the requested variables."""
         query = dict(request.query)
         self.queries.append(query)
+        self.raw_queries.append(request.rel_url.raw_query_string)
         out = []
         for name, value in query.items():
             if name == "sys.nad_list":
@@ -138,7 +140,7 @@ async def test_request_query_without_empty_values(server: FakeScgiServer) -> Non
     await cybro.request(data={"a": "", "b": "1", "c": ""})
     await cybro.disconnect()
 
-    assert server.queries == [{"a": "", "b": "1", "c": ""}]
+    assert server.raw_queries == ["a&b=1&c"]
 
 
 @pytest.mark.asyncio
@@ -239,7 +241,6 @@ async def test_update(server: FakeScgiServer) -> None:
     await cybro.disconnect()
 
     assert device.server_info.server_version == "3.3.1"
-    assert device.server_info.nad_list == str(NAD)
     assert device.plc_info.plc_status == "ok"
     assert device.plc_info.ip_port == "192.168.1.20:8442"
     assert device.plc_info.plc_vars == {
@@ -248,6 +249,21 @@ async def test_update(server: FakeScgiServer) -> None:
         f"{PREFIX}scan_time_max": "int",
         f"{PREFIX}cybro_qx00": "bit",
     }
+
+
+@pytest.mark.asyncio
+@pytest.mark.xfail(
+    strict=True,
+    reason="Bug: with a single controller, nad_list is a string instead of"
+    " the declared list[str]",
+)
+async def test_update_single_controller(server: FakeScgiServer) -> None:
+    """nad_list is a list, also with a single controller."""
+    cybro = Cybro(HOST, nad=NAD)
+    device = await cybro.update()
+    await cybro.disconnect()
+
+    assert device.server_info.nad_list == [str(NAD)]
 
 
 @pytest.mark.asyncio
@@ -363,14 +379,27 @@ async def test_read_var(server: FakeScgiServer) -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.xfail(
+    strict=True,
+    reason="Bug: read_var_int/float/bool return the raw string instead of"
+    " int, float and bool",
+)
 async def test_read_var_typed(server: FakeScgiServer) -> None:
-    """The typed read methods currently return the value as a string."""
+    """The typed read methods return int, float and bool."""
     cybro = Cybro(HOST, nad=NAD)
     await cybro.update()
-    assert await cybro.read_var_int(f"{PREFIX}scan_time") == "6"
-    assert await cybro.read_var_float(f"{PREFIX}scan_time") == "6"
-    assert await cybro.read_var_bool(f"{PREFIX}scan_overrun") == "0"
-    await cybro.disconnect()
+    try:
+        value_int = await cybro.read_var_int(f"{PREFIX}scan_time")
+        value_float = await cybro.read_var_float(f"{PREFIX}scan_time")
+        value_bool = await cybro.read_var_bool(f"{PREFIX}scan_overrun")
+    finally:
+        await cybro.disconnect()
+
+    assert value_int == 6
+    assert isinstance(value_int, int)
+    assert value_float == 6.0
+    assert isinstance(value_float, float)
+    assert value_bool is False
 
 
 @pytest.mark.asyncio
