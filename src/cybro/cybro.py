@@ -141,13 +141,11 @@ class Cybro:
                     headers=headers,
                 )
 
-            content_type = response.headers.get("Content-Type", "")
-
             if response.status // 100 in [4, 5]:
                 contents = await response.read()
                 response.close()
 
-                if content_type == "application/json":
+                if response.content_type == "application/json":
                     raise CybroError(
                         response.status, json.loads(contents.decode("utf8"))
                     )
