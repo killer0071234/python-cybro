@@ -1,13 +1,14 @@
-"""Tests for `cybro.Cybro`."""  # fmt: skip
+"""Tests for `cybro.Cybro`."""
+
 import unittest
 from typing import Any
 from unittest import IsolatedAsyncioTestCase
 from unittest.mock import patch
 
 from src.cybro import __all__ as cybro_all
+from src.cybro.cybro import Cybro
 from src.cybro.cybro import _add_hiq_tags
 from src.cybro.cybro import _get_chunk
-from src.cybro.cybro import Cybro
 from src.cybro.exceptions import CybroEmptyResponseError
 from src.cybro.exceptions import CybroError
 from src.cybro.exceptions import CybroPlcNotFoundError
@@ -17,35 +18,8 @@ from src.cybro.models import ServerInfo
 from src.cybro.models import Var
 
 
-# This method will be used by the mock to replace requests.get
-def mocked_requests_get(*args, **kwargs):
-    """Mocked data request."""
-
-    class MockResponse:
-        """Mocked response."""
-
-        def __init__(self, xml_data, status_code):
-            self.xml_data = xml_data
-            self.status = status_code
-            self.read = xml_data
-
-        def xml(self):
-            """get only xml."""
-            return self.xml_data
-
-    if args[0] == "example.com":
-        return MockResponse(
-            "<data><var><name>c10000.scan_time</name><value>1</value><description>Last scan execution time [ms].</description></var></data>",
-            200,
-        )
-    elif args[0] == "http://someotherurl.com/anothertest.json":
-        return MockResponse({"key2": "value2"}, 200)
-
-    return MockResponse(None, 404)
-
-
 def var_dict() -> dict[str, str]:
-    """Return variable values as ditionary."""
+    """Return variable values as dictionary."""
     _vars: dict[str, Any] = {
         "sys.server_uptime": "00 days, 01:02:03",
         "sys.scgi_request_count": 23,
@@ -187,7 +161,7 @@ class TestCybro(IsolatedAsyncioTestCase):
         self.assertCountEqual(res, {})
 
     def test_var_from_dict(self) -> None:
-        """Check for Var parsing"""
+        """Check for Var parsing."""
         var = Var.from_dict(
             {"name": "sys.server_version", "value": "3.2.6", "description": "Desc."}
         )
@@ -381,12 +355,6 @@ class TestCybro(IsolatedAsyncioTestCase):
         device.remove_var("c1000.scan_time")
         self.assertIsInstance(device, Device)
 
-    # def test_cybro_add_var(self) -> None:
-    #    """Test to add a var."""
-    #    _dev = Cybro("localhost", 4000, 1)
-    #    _dev.add_var("c1.test")
-    #    self.assertIsNotNone(_dev)
-
     def test_cybro_get_chunk(self) -> None:
         """Get a single chunk."""
         _vars_check = {}
@@ -424,23 +392,6 @@ class TestCybro(IsolatedAsyncioTestCase):
         _vars = {}
         _vars = _add_hiq_tags(_vars, "c1.")
         self.assertCountEqual(_vars, _vars_check)
-
-    # We patch 'aiohttp.client.ClientSession' with our own method. The mock object is passed in to our test case method.
-    # @patch("aiohttp.client.ClientSession", spec=True)
-    # @mock.patch("aiohttp.client.ClientSession", side_effect=mocked_requests_get)
-    # async def test_update(self, mock_get) -> None:
-    #    """Test update."""
-    #    mock_response = MagicMock()
-    #    mock_response.status = 200
-    #    mock_response.read.return_value = "<data><var><name>c10000.scan_time</name><value>1</value><description>Last scan execution time [ms].</description></var></data>"
-    #    mock_response.get.return_value = "<data><var><name>c10000.scan_time</name><value>1</value><description>Last scan execution time [ms].</description></var></data>"
-    #    mock_response.text.return_value = "<data><var><name>c10000.scan_time</name><value>1</value><description>Last scan execution time [ms].</description></var></data>"
-    #    mock_get.return_value = mock_response
-    #    async with aiohttp.ClientSession() as session:
-    #        cybro = Cybro("example.com", 80, session=session)
-    #        print(cybro)
-    #        response = await cybro.update()
-    #        assert response is None
 
 
 if __name__ == "__main__":

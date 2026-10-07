@@ -1,7 +1,7 @@
-"""Asynchronous Python client for Cybro scgi server."""  # fmt: skip
+"""Asynchronous Python client for Cybro scgi server."""
+
 from __future__ import annotations
 
-import asyncio
 import json
 import socket
 from dataclasses import dataclass
@@ -155,7 +155,7 @@ class Cybro:
 
             response_data = xmltodict.parse(await response.text())
 
-        except asyncio.TimeoutError as exception:
+        except TimeoutError as exception:
             raise CybroConnectionTimeoutError(
                 f"Timeout occurred while connecting to server at {self.host}:{self.port}"
             ) from exception
@@ -326,7 +326,8 @@ class Cybro:
         """Add a variable into update buffer.
 
         name: Variable name to read eg: c1000.scan_time
-        allow_all: Optionally allow to add also non existing variables"""
+        allow_all: Optionally allow to add also non existing variables
+        """
         self._get_device().add_var(name, allow_all=allow_all)
 
     def remove_var(self, name: str) -> None:
@@ -365,7 +366,7 @@ class Cybro:
 def _get_chunk(data, chunk_size):
     """Split dictionary into smaller chunks."""
     data_it = iter(data)
-    for i in range(0, len(data), chunk_size):
+    for _ in range(0, len(data), chunk_size):
         yield {k: data[k] for k in islice(data_it, chunk_size)}
 
 

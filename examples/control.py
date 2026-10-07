@@ -1,4 +1,5 @@
-"""Example: read and write variables of a Cybro PLC through a scgi server."""  # fmt: skip
+"""Example: read and write variables of a Cybro PLC through a scgi server."""
+
 import argparse
 import asyncio
 

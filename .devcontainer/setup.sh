@@ -6,6 +6,7 @@ set -e
 
 cd "$(dirname "$0")/.."
 
-pip3 install -r .github/workflows/constraints.txt
-pip3 install -r requirements.txt
-pre-commit install
+pip3 install poetry
+poetry config virtualenvs.in-project true
+poetry install
+poetry run pre-commit install

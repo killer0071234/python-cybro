@@ -1,4 +1,5 @@
-"""Models for Cybro scgi server objects."""  # fmt: skip
+"""Models for Cybro scgi server objects."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -49,7 +50,7 @@ class ServerInfo:  # pylint:
 
     @staticmethod
     def from_dict(data: dict[str, Any]) -> ServerInfo:
-        """generate ServerInfo object out of name / value dictionary
+        """Generate ServerInfo object out of name / value dictionary.
 
         Args:
             data: Received data from SCGI server.
@@ -58,7 +59,7 @@ class ServerInfo:  # pylint:
             ServerInfo data.
 
         Raises:
-            CybroError: The Cybro SCGI server returned no or incomlete Server info data.
+            CybroError: The Cybro SCGI server returned no or incomplete Server info data.
         """
         try:
             return ServerInfo(
@@ -80,7 +81,7 @@ class ServerInfo:  # pylint:
 
     @staticmethod
     def from_vars(variables: dict[str, Var]) -> ServerInfo:
-        """generate ServerInfo object out of name / Var object dictionary
+        """Generate ServerInfo object out of name / Var object dictionary.
 
         Args:
             variables: Received data from SCGI server.
@@ -89,7 +90,7 @@ class ServerInfo:  # pylint:
             ServerInfo data.
 
         Raises:
-            CybroError: The Cybro scgi server returned no or incomlete Server info data.
+            CybroError: The Cybro scgi server returned no or incomplete Server info data.
         """
         try:
             return ServerInfo(
@@ -139,7 +140,7 @@ class PlcInfo:  # pylint:
 
     @staticmethod
     def from_dict(data: dict[str, Any], plc_nad: int) -> PlcInfo:
-        """generate PlcInfo object out of name / value dictionary
+        """Generate PlcInfo object out of name / value dictionary.
 
         Args:
             data: Received data from SCGI server.
@@ -149,7 +150,7 @@ class PlcInfo:  # pylint:
             PlcInfo data.
 
         Raises:
-            CybroPlcNotFoundError: The Cybro scgi server returned no or incomlete PLC data.
+            CybroPlcNotFoundError: The Cybro scgi server returned no or incomplete PLC data.
         """
         try:
             return PlcInfo(
@@ -170,7 +171,7 @@ class PlcInfo:  # pylint:
 
     @staticmethod
     def from_vars(variables: dict[str, Var], plc_nad: int) -> PlcInfo:
-        """generate PlcInfo object out of name / Var object dictionary
+        """Generate PlcInfo object out of name / Var object dictionary.
 
         Args:
             variables: Force a full update from the device Device.
@@ -180,7 +181,7 @@ class PlcInfo:  # pylint:
             PlcInfo data.
 
         Raises:
-            CybroPlcNotFoundError: The Cybro scgi server returned no or incomlete PLC data.
+            CybroPlcNotFoundError: The Cybro scgi server returned no or incomplete PLC data.
         """
         nad = plc_nad
         try:
@@ -209,7 +210,7 @@ class PlcInfo:  # pylint:
             raise CybroPlcNotFoundError(f"Cybro PLC with NAD {nad} not found") from err
 
     def parse_alc_file(self) -> dict[str, str]:
-        """Shall be called after update of PlcInfo to refresh list of all plc vars"""
+        """Refresh the list of all PLC variables; call after an update of PlcInfo."""
         prefix = f"c{self.nad}."
         res: dict[str, str] = {}
         if self.alc_file is None:
@@ -226,7 +227,7 @@ class PlcInfo:  # pylint:
 
 @dataclass
 class Var:
-    """object representing a scgi server variable"""
+    """Object representing a scgi server variable."""
 
     name: str
     """name of variable"""
@@ -236,13 +237,14 @@ class Var:
     """description of the variable"""
 
     def __init__(self, name: str, value: str, description: str) -> None:
+        """Initialize a variable with its name, value and description."""
         self.name = name
         self.value = value
         self.description = description
 
     @staticmethod
     def from_dict(data: dict[str, Any]) -> Var:
-        """split a dict with "name", "value" and "description" into a Var object"""
+        """Split a dict with "name", "value" and "description" into a Var object."""
         return Var(
             name=data.get("name"),
             value=data.get("value"),
@@ -250,19 +252,19 @@ class Var:
         )
 
     def value_string(self) -> str:
-        """get current value"""
+        """Get current value."""
         return self.value
 
     def value_int(self) -> int:
-        """get current value"""
+        """Get current value."""
         return int(self.value)
 
     def value_bool(self) -> bool:
-        """get current value"""
+        """Get current value."""
         return bool(self.value == "1")
 
     def value_float(self) -> float:
-        """get current value"""
+        """Get current value."""
         return float(self.value)
 
 
@@ -384,7 +386,8 @@ class Device:
         Args:
             name: Variable name to read eg: c1000.scan_time
             var_type: Optionally defines a Variable Type
-            allow_all: Optionally allow to add also non existing variables"""
+            allow_all: Optionally allow to add also non existing variables
+        """
         if (
             allow_all
             or ".sys." in name
@@ -397,13 +400,14 @@ class Device:
         """Removes a variable from the read list.
 
         Args:
-            name: Variable name to delete from user_vars"""
+            name: Variable name to delete from user_vars
+        """
         self.user_vars.pop(name, "")
         self.vars_types.pop(name, "")
 
 
 class VarType(IntEnum):
-    """Enumeration representing variable types"""
+    """Enumeration representing variable types."""
 
     STR = 0
     INT = 1

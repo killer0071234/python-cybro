@@ -18,26 +18,27 @@ jobs:
     runs-on: ubuntu-latest
     name: Pre-commit
     steps:
-      - name: Check out the repository
+      - name: ⤵️ Check out code from GitHub
         uses: actions/checkout@v4
-
-      - name: Set up Python ${{ env.DEFAULT_PYTHON }}
+      - name: 🏗 Install Poetry
+        run: pipx install poetry
+      - name: 🏗 Set up Python ${{ env.DEFAULT_PYTHON }}
+        id: python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.DEFAULT_PYTHON }}
-
-      - name: Upgrade pip
+          cache: poetry
+      - name: 🏗 Install dependencies
         run: |
-          pip install --constraint=.github/workflows/constraints.txt pip
-          pip --version
-
-      - name: Install Python modules
-        run: |
-          pip install --constraint=.github/workflows/constraints.txt pre-commit black flake8 reorder-python-imports poetry pytest pytest-asyncio pytest-cov aiohttp async_timeout yarl xmltodict numpy cachetools backoff
-
-      - name: Run pre-commit on all files
-        run: |
-          pre-commit run --all-files --show-diff-on-failure --color=always
+          poetry env use "${{ steps.python.outputs.python-path }}"
+          poetry install --no-interaction
+      - name: ⤵️ Restore cached pre-commit environments
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pre-commit
+          key: pre-commit-${{ steps.python.outputs.python-version }}-${{ hashFiles('.pre-commit-config.yaml') }}
+      - name: 🚀 Run pre-commit on all files
+        run: poetry run pre-commit run --all-files --show-diff-on-failure --color=always
 
   pytest:
     name: Python ${{ matrix.python }}
@@ -48,37 +49,18 @@ jobs:
     steps:
       - name: ⤵️ Check out code from GitHub
         uses: actions/checkout@v4
+      - name: 🏗 Install Poetry
+        run: pipx install poetry
       - name: 🏗 Set up Python ${{ matrix.python }}
         id: python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
-      - name: 🏗 Get pip cache dir
-        id: pip-cache
-        run: |
-          echo "dir=$(pip cache dir)" >> "$GITHUB_OUTPUT"
-      - name: ⤵️ Restore cached Python PIP packages
-        uses: actions/cache@v4
-        with:
-          path: ${{ steps.pip-cache.outputs.dir }}
-          key: pip-${{ steps.python.outputs.python-version }}-${{ hashFiles('requirements.txt') }}
-          restore-keys: |
-            pip-${{ steps.python.outputs.python-version }}-
-      - name: 🏗 Install workflow dependencies
-        run: |
-          pip install -r requirements.txt
-          poetry config virtualenvs.create true
-          poetry config virtualenvs.in-project true
-      - name: ⤵️ Restore cached Python virtual environment
-        id: cached-poetry-dependencies
-        uses: actions/cache@v4
-        with:
-          path: .venv
-          key: venv-${{ steps.python.outputs.python-version }}-${{ hashFiles('poetry.lock') }}
-          restore-keys: |
-            venv-${{ steps.python.outputs.python-version }}-
+          cache: poetry
       - name: 🏗 Install dependencies
-        run: poetry install --no-interaction
+        run: |
+          poetry env use "${{ steps.python.outputs.python-path }}"
+          poetry install --no-interaction
       - name: 🚀 Run pytest
         run: poetry run pytest --cov cybro tests
       - name: ⬆️ Upload coverage artifact
@@ -96,37 +78,18 @@ jobs:
         uses: actions/checkout@v4
       - name: ⬇️ Download coverage data
         uses: actions/download-artifact@v7
+      - name: 🏗 Install Poetry
+        run: pipx install poetry
       - name: 🏗 Set up Python ${{ env.DEFAULT_PYTHON }}
         id: python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.DEFAULT_PYTHON }}
-      - name: 🏗 Get pip cache dir
-        id: pip-cache
-        run: |
-          echo "dir=$(pip cache dir)" >> "$GITHUB_OUTPUT"
-      - name: ⤵️ Restore cached Python PIP packages
-        uses: actions/cache@v4
-        with:
-          path: ${{ steps.pip-cache.outputs.dir }}
-          key: pip-${{ steps.python.outputs.python-version }}-${{ hashFiles('requirements.txt') }}
-          restore-keys: |
-            pip-${{ steps.python.outputs.python-version }}-
-      - name: 🏗 Install workflow dependencies
-        run: |
-          pip install -r requirements.txt
-          poetry config virtualenvs.create true
-          poetry config virtualenvs.in-project true
-      - name: ⤵️ Restore cached Python virtual environment
-        id: cached-poetry-dependencies
-        uses: actions/cache@v4
-        with:
-          path: .venv
-          key: venv-${{ steps.python.outputs.python-version }}-${{ hashFiles('poetry.lock') }}
-          restore-keys: |
-            venv-${{ steps.python.outputs.python-version }}-
+          cache: poetry
       - name: 🏗 Install dependencies
-        run: poetry install --no-interaction
+        run: |
+          poetry env use "${{ steps.python.outputs.python-path }}"
+          poetry install --no-interaction
       - name: 🚀 Process coverage results
         run: |
           poetry run coverage combine coverage*/.coverage*

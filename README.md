@@ -8,7 +8,7 @@
 [![GitHub Activity][commits-shield]][commits]
 [![Code Coverage][codecov-shield]][codecov]
 [![pre-commit][pre-commit-shield]][pre-commit]
-[![Black][black-shield]][black]
+[![Ruff][ruff-shield]][ruff]
 
 [![Project Maintenance][maintenance-shield]][user_profile]
 
@@ -144,7 +144,7 @@ A ready-to-use [dev container](.devcontainer) is included for VS Code.
 ```bash
 poetry install
 poetry run pytest
-poetry run pre-commit install  # run linters before every commit
+poetry run pre-commit install  # run Ruff, prettier and the tests before every commit
 ```
 
 ## Contributing
@@ -157,8 +157,6 @@ Contributions are welcome! Please read the [contribution guidelines](CONTRIBUTIN
 
 ---
 
-[black]: https://github.com/psf/black
-[black-shield]: https://img.shields.io/badge/code%20style-black-000000.svg?style=for-the-badge
 [commits-shield]: https://img.shields.io/github/commit-activity/y/killer0071234/python-cybro.svg?style=for-the-badge
 [commits]: https://github.com/killer0071234/python-cybro/commits/main
 [codecov-shield]: https://img.shields.io/codecov/c/gh/killer0071234/python-cybro?style=for-the-badge&token=2VFGXXQ4N0
@@ -172,6 +170,8 @@ Contributions are welcome! Please read the [contribution guidelines](CONTRIBUTIN
 [python-shield]: https://img.shields.io/pypi/pyversions/cybro.svg?style=for-the-badge
 [releases-shield]: https://img.shields.io/github/release/killer0071234/python-cybro.svg?style=for-the-badge
 [releases]: https://github.com/killer0071234/python-cybro/releases
+[ruff]: https://github.com/astral-sh/ruff
+[ruff-shield]: https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json&style=for-the-badge
 [user_profile]: https://github.com/killer0071234
 [scgi-docker-shield]: https://img.shields.io/badge/dockerhub-cybroscgiserver-brightgreen.svg?style=for-the-badge
 [scgi-docker]: https://hub.docker.com/r/killer007/cybroscgiserver
