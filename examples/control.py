@@ -43,12 +43,13 @@ async def main(host: str, port: int, nad: int, write: str | None) -> None:
         nad_list = device.server_info.nad_list or []
         if isinstance(nad_list, str):  # a single controller is returned as a string
             nad_list = [nad_list]
-        if f"c{nad}" not in nad_list:
+        # The server lists NADs as plain numbers, e.g. "12762"
+        if str(nad) not in [str(item).removeprefix("c") for item in nad_list]:
             raise SystemExit(f"error: PLC with NAD {nad} is not known to the server")
 
         print("PLC address:   ", device.plc_info.ip_port)
         print("PLC status:    ", device.plc_info.plc_status)
-        print("PLC program:   ", device.plc_info.alc_file)
+        print("PLC variables: ", len(device.plc_info.plc_vars))
 
         # Register variables, then refresh them with a second update.
         for name in STATUS_VARS:
