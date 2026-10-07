@@ -71,11 +71,12 @@ A longer example lives in [examples/control.py](examples/control.py).
 
 ### Connecting
 
-`Cybro(host, port=4000, nad=0, session=None)`
+`Cybro(host_str, port=4000, nad=0, session=None)`
 
-- `host` can be a plain host name or IP address, or a URL with a path,
+- `host_str` can be a plain host name or IP address, or a URL with a path,
   e.g. `http://example.com/scgi`. The scheme is ignored; requests always use HTTP.
-- `nad` is the network address of the PLC. With `nad=0`, only server information is read.
+- `nad` is the network address of the PLC. It is needed for PLC information and for `add_var()`.
+  With `nad=0` (the default), only server information is read. See [Server only (`nad=0`)](#server-only-nad0).
 - `session` lets you pass your own `aiohttp.ClientSession`. Otherwise one is created
   on the first request. Call `await cybro.disconnect()` to close it.
   Leaving an `async with Cybro(...)` block does **not** close the session.
@@ -94,6 +95,20 @@ A longer example lives in [examples/control.py](examples/control.py).
 - The first call (or `full_update=True`) reads server and PLC information.
   Later calls only refresh the variables registered with `add_var()`.
 - Set `device_type=1` for HIQ controllers to also read their HIQ-specific variables.
+- `plc_nad` sets the PLC address if none was given to `Cybro()`. It only takes effect
+  on the very first `update()` call.
+
+### Server only (`nad=0`)
+
+Without a NAD, `update()` reads only the server information. Use this to check that the
+server is reachable, or to list the controllers it knows (`device.server_info.nad_list`).
+In this mode:
+
+- `device.plc_info` is not set. Accessing it raises `AttributeError`.
+- `cybro.add_var(name)` raises `AttributeError`. Pass `allow_all=True` to register variables anyway.
+- `read_var()` and `write_var()` work with full variable names, e.g. `c10000.scan_time`.
+
+To work with a PLC, create the `Cybro` object with its NAD.
 
 ### Variables
 
