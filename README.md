@@ -104,8 +104,8 @@ Without a NAD, `update()` reads only the server information. Use this to check t
 server is reachable, or to list the controllers it knows (`device.server_info.nad_list`).
 In this mode:
 
-- `device.plc_info` is not set. Accessing it raises `AttributeError`.
-- `cybro.add_var(name)` raises `AttributeError`. Pass `allow_all=True` to register variables anyway.
+- `device.plc_info` is `None`.
+- `cybro.add_var(name)` only accepts system variables (`c<nad>.sys.*`). Pass `allow_all=True` to register other variables.
 - `read_var()` and `write_var()` work with full variable names, e.g. `c10000.scan_time`.
 
 To work with a PLC, create the `Cybro` object with its NAD.
@@ -124,9 +124,17 @@ Values are returned as strings. Each `Var` in `device.vars` has helpers to conve
 
 ### Errors
 
-The library raises `CybroError` and its subclasses `CybroConnectionError` and
-`CybroConnectionTimeoutError`. Failed requests are retried up to three times
-before an exception is raised.
+All exceptions derive from `CybroError`, so catching it is enough:
+
+| Exception                     | Raised when                                                         |
+| ----------------------------- | ------------------------------------------------------------------- |
+| `CybroConnectionError`        | The scgi server cannot be reached                                   |
+| `CybroConnectionTimeoutError` | The scgi server does not answer in time                             |
+| `CybroEmptyResponseError`     | The scgi server returns an empty response                           |
+| `CybroPlcNotFoundError`       | The PLC information for the NAD is missing                          |
+| `CybroError`                  | Any other error, e.g. `add_var()` or `read_var()` before `update()` |
+
+Failed requests are retried up to three times before an exception is raised.
 
 ## Development
 

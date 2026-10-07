@@ -2,7 +2,9 @@
 from .cybro import Cybro
 from .exceptions import CybroConnectionError
 from .exceptions import CybroConnectionTimeoutError
+from .exceptions import CybroEmptyResponseError
 from .exceptions import CybroError
+from .exceptions import CybroPlcNotFoundError
 from .models import Device
 from .models import ServerInfo
 from .models import Var
@@ -16,5 +18,7 @@ __all__ = [
     "Cybro",
     "CybroConnectionError",
     "CybroConnectionTimeoutError",
+    "CybroEmptyResponseError",
     "CybroError",
+    "CybroPlcNotFoundError",
 ]

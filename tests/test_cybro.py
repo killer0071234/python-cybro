@@ -4,9 +4,11 @@ from typing import Any
 from unittest import IsolatedAsyncioTestCase
 from unittest.mock import patch
 
+from src.cybro import __all__ as cybro_all
 from src.cybro.cybro import _add_hiq_tags
 from src.cybro.cybro import _get_chunk
 from src.cybro.cybro import Cybro
+from src.cybro.exceptions import CybroEmptyResponseError
 from src.cybro.exceptions import CybroError
 from src.cybro.exceptions import CybroPlcNotFoundError
 from src.cybro.models import Device
@@ -328,6 +330,49 @@ class TestCybro(IsolatedAsyncioTestCase):
             values["c1000.sys.plc_status"] = "offline"
             device = await cybro.update(full_update=True)
             self.assertEqual(device.plc_info.plc_status, "offline")
+
+    def test_device_without_nad(self) -> None:
+        """A device without NAD has no PLC info and only accepts system variables."""
+        device = Device(api_resp())
+        self.assertIsNone(device.plc_info)
+        device.add_var("c1000.scan_time")
+        self.assertNotIn("c1000.scan_time", device.user_vars)
+        device.add_var("c1000.sys.response_time")
+        self.assertIn("c1000.sys.response_time", device.user_vars)
+        device.add_var("c1000.scan_time", allow_all=True)
+        self.assertIn("c1000.scan_time", device.user_vars)
+
+    async def test_cybro_requires_update(self) -> None:
+        """Variable access before update() raises a clear error without a request."""
+        cybro = Cybro("127.0.0.1", 4000, 1000)
+        with patch.object(cybro, "request") as request:
+            with self.assertRaisesRegex(CybroError, "call update"):
+                cybro.add_var("c1000.scan_time")
+            with self.assertRaisesRegex(CybroError, "call update"):
+                cybro.remove_var("c1000.scan_time")
+            with self.assertRaisesRegex(CybroError, "call update"):
+                await cybro.read_var("c1000.scan_time")
+            with self.assertRaisesRegex(CybroError, "call update"):
+                await cybro.write_var("c1000.scan_time", "1")
+            request.assert_not_called()
+
+    def test_exceptions(self) -> None:
+        """All exceptions derive from CybroError and are exported."""
+        self.assertTrue(issubclass(CybroEmptyResponseError, CybroError))
+        self.assertTrue(issubclass(CybroPlcNotFoundError, CybroError))
+        self.assertIn("CybroEmptyResponseError", cybro_all)
+        self.assertIn("CybroPlcNotFoundError", cybro_all)
+
+    def test_exception_chaining(self) -> None:
+        """Errors keep the original exception as cause."""
+        with self.assertRaises(CybroError) as ctx:
+            ServerInfo.from_dict({})
+        self.assertIsInstance(ctx.exception.__cause__, KeyError)
+        self.assertEqual(ctx.exception.__cause__.args, ("sys.server_uptime",))
+        with self.assertRaises(CybroPlcNotFoundError) as ctx:
+            PlcInfo.from_vars({}, 1000)
+        self.assertIsInstance(ctx.exception.__cause__, AttributeError)
+        self.assertIsNotNone(ctx.exception.__cause__.__traceback__)
 
     def test_device_remove_var(self) -> None:
         """Remove a single var."""

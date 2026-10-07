@@ -75,8 +75,8 @@ class ServerInfo:  # pylint:
                 udp_tx_count=data["sys.udp_tx_count"],
                 nad_list=data["sys.nad_list"].get("item"),
             )
-        except KeyError:
-            raise CybroError("Not all ServerInfo tags found in data") from KeyError
+        except KeyError as err:
+            raise CybroError("Not all ServerInfo tags found in data") from err
 
     @staticmethod
     def from_vars(variables: dict[str, Var]) -> ServerInfo:
@@ -106,10 +106,8 @@ class ServerInfo:  # pylint:
                 udp_tx_count=variables.get("sys.udp_tx_count").value,
                 nad_list=variables.get("sys.nad_list").value.get("item"),
             )
-        except AttributeError:
-            raise CybroError(
-                "Not all ServerInfo tags found in data"
-            ) from AttributeError
+        except AttributeError as err:
+            raise CybroError("Not all ServerInfo tags found in data") from err
 
 
 @dataclass
@@ -165,10 +163,10 @@ class PlcInfo:  # pylint:
                 alc_file=data["c" + str(plc_nad) + ".sys.alc_file"],
                 plc_vars={},
             )
-        except KeyError:
+        except KeyError as err:
             raise CybroPlcNotFoundError(
-                "Not all ServerInfo tags found in data"
-            ) from KeyError
+                f"Not all PlcInfo tags found in data for NAD {plc_nad}"
+            ) from err
 
     @staticmethod
     def from_vars(variables: dict[str, Var], plc_nad: int) -> PlcInfo:
@@ -207,10 +205,8 @@ class PlcInfo:  # pylint:
                 alc_file=variables.get("c" + str(plc_nad) + ".sys.alc_file", "").value,
                 plc_vars={},
             )
-        except AttributeError:
-            raise CybroPlcNotFoundError(
-                f"Cybro PLC with NAD {nad} not found"
-            ) from AttributeError
+        except AttributeError as err:
+            raise CybroPlcNotFoundError(f"Cybro PLC with NAD {nad} not found") from err
 
     def parse_alc_file(self) -> dict[str, str]:
         """Shall be called after update of PlcInfo to refresh list of all plc vars"""
@@ -294,6 +290,7 @@ class Device:
             CybroError: In case the given API response is incomplete in a way
                 that a Device object cannot be constructed from it.
         """
+        self.plc_info = None
         self.vars = {}
         self.user_vars = {}
         self.vars_types = {}
@@ -388,7 +385,11 @@ class Device:
             name: Variable name to read eg: c1000.scan_time
             var_type: Optionally defines a Variable Type
             allow_all: Optionally allow to add also non existing variables"""
-        if allow_all or name in self.plc_info.plc_vars or name.find(".sys.") != -1:
+        if (
+            allow_all
+            or ".sys." in name
+            or (self.plc_info is not None and name in self.plc_info.plc_vars)
+        ):
             self.user_vars.update({name: ""})
             self.vars_types.update({name: var_type})
 
