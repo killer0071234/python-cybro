@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import socket
 from dataclasses import dataclass
@@ -10,7 +11,6 @@ from typing import Any
 from urllib.parse import quote
 
 import aiohttp
-import async_timeout
 import backoff
 import xmltodict
 from cachetools import TTLCache
@@ -40,6 +40,7 @@ class Cybro:
     session: aiohttp.client.ClientSession | None = None
 
     _device: Device | None = None
+    _close_session: bool = False
 
     def __init__(
         self,
@@ -54,7 +55,7 @@ class Cybro:
             host_str: Cybro scgi server connection string
             port: Cybro scgi server port (Default: 4000)
             nad: Cybro PLC NAD (Network address)
-            session: optional a aiohttp session
+            session: optional aiohttp session; it is not closed by disconnect()
         """
         new_host = host_str
         new_path = ""
@@ -72,15 +73,17 @@ class Cybro:
             self.session = session
 
     async def disconnect(self) -> None:
-        """Disconnect from cybro scgi server object."""
-        if self.session is not None:
+        """Close the session, if it was created by this object."""
+        if self.session is not None and self._close_session:
             await self.session.close()
             self.session = None
+            self._close_session = False
 
     @backoff.on_exception(
         backoff.expo,
-        (CybroConnectionError, CybroConnectionTimeoutError, CybroError),
+        CybroError,
         max_tries=3,
+        giveup=lambda err: not _is_retryable(err),
         logger=None,
     )
     async def request(
@@ -89,8 +92,9 @@ class Cybro:
     ) -> Any:
         """Handle a request to a scgi server.
 
-        A generic method for sending/handling HTTP requests done gainst
-        the scgi server.
+        A generic method for sending/handling HTTP requests done against
+        the scgi server. Connection errors, timeouts and server errors (HTTP 5xx)
+        are retried up to three times.
 
         Args:
             data: string / Dictionary of data to send to the scgi server.
@@ -116,38 +120,39 @@ class Cybro:
 
         if self.session is None:
             self.session = aiohttp.client.ClientSession()
+            self._close_session = True
 
         try:
-            async with async_timeout.timeout(self.request_timeout):
-                response = await self.session.get(
+            async with (
+                asyncio.timeout(self.request_timeout),
+                self.session.get(
                     url=url,
                     allow_redirects=False,
                     ssl=False,
                     headers=headers,
-                )
-
-            if response.status // 100 in [4, 5]:
-                contents = await response.read()
-                response.close()
-
-                if response.content_type == "application/json":
+                ) as response,
+            ):
+                if 400 <= response.status < 600:
+                    contents = await response.read()
+                    if response.content_type == "application/json":
+                        raise CybroError(
+                            response.status, json.loads(contents.decode("utf8"))
+                        )
                     raise CybroError(
-                        response.status, json.loads(contents.decode("utf8"))
+                        response.status, {"message": contents.decode("utf8")}
                     )
-                raise CybroError(response.status, {"message": contents.decode("utf8")})
-
-            response_data = xmltodict.parse(await response.text())
+                text = await response.text()
 
         except TimeoutError as exception:
             raise CybroConnectionTimeoutError(
                 f"Timeout occurred while connecting to server at {self.host}:{self.port}"
             ) from exception
         except (aiohttp.ClientError, socket.gaierror) as exception:
-            print(exception)
             raise CybroConnectionError(
                 f"Error occurred while communicating with server at {self.host}:{self.port}"
             ) from exception
 
+        response_data = xmltodict.parse(text)
         return response_data.get("data")
 
     @backoff.on_exception(
@@ -249,9 +254,6 @@ class Cybro:
 
         return self._device
 
-    @backoff.on_exception(
-        backoff.expo, CybroEmptyResponseError, max_tries=3, logger=None
-    )
     async def write_var(
         self, name: str, value: str, var_type: VarType = VarType.STR
     ) -> str | int | float | bool:
@@ -275,9 +277,6 @@ class Cybro:
             )
         return device.update_var(data, var_type=var_type)
 
-    @backoff.on_exception(
-        backoff.expo, CybroEmptyResponseError, max_tries=3, logger=None
-    )
     async def read_var_int(
         self,
         name: str,
@@ -285,9 +284,6 @@ class Cybro:
         """Read a single variable from scgi server as int."""
         return await self.read_var(name, VarType.INT)
 
-    @backoff.on_exception(
-        backoff.expo, CybroEmptyResponseError, max_tries=3, logger=None
-    )
     async def read_var_float(
         self,
         name: str,
@@ -295,14 +291,11 @@ class Cybro:
         """Read a single variable from scgi server as float."""
         return await self.read_var(name, VarType.FLOAT)
 
-    @backoff.on_exception(
-        backoff.expo, CybroEmptyResponseError, max_tries=3, logger=None
-    )
     async def read_var_bool(
         self,
         name: str,
     ) -> bool:
-        """Read a single variable from scgi server as float."""
+        """Read a single variable from scgi server as bool."""
         return await self.read_var(name, VarType.BOOL)
 
     def add_var(self, name: str, allow_all: bool = False) -> None:
@@ -339,11 +332,30 @@ class Cybro:
         return self
 
     async def __aexit__(self, *_exc_info) -> None:
-        """Async exit.
+        """Async exit, closes the session if it was created by this object.
 
         Args:
             _exc_info: Exec type.
         """
+        await self.disconnect()
+
+
+def _is_retryable(err: Exception) -> bool:
+    """Return whether a failed request is worth retrying.
+
+    Connection errors, timeouts and server errors (HTTP 5xx) may be temporary.
+    Client errors (HTTP 4xx) will fail again.
+
+    Args:
+        err: The exception raised by the request.
+
+    Returns:
+        True if the request should be retried.
+    """
+    if isinstance(err, CybroConnectionError):
+        return True
+    status = err.args[0] if err.args else None
+    return isinstance(status, int) and status >= 500
 
 
 def _build_query(data: dict | str | None) -> str:
