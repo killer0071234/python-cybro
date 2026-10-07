@@ -1,5 +1,5 @@
 aiohttp==3.9.5
-async_timeout==4.0.3
+async_timeout==5.0.1
 xmltodict==1.0.4
 pip==26.2.1
 pre-commit==4.0.1
