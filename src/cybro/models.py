@@ -276,11 +276,11 @@ class Device:
     info: str
     server_info: ServerInfo
     plc_info: PlcInfo | None
-    vars: dict[str, Var] = {}
+    vars: dict[str, Var]
     """list of variable / value / descriptions (after read/write)"""
-    user_vars: dict[str, str] = {}
+    user_vars: dict[str, str]
     """list of all variables to periodically update"""
-    vars_types: dict[str, int] = {}
+    vars_types: dict[str, int]
     """list of variable types"""
 
     def __init__(self, data: dict, plc_nad: int = 0) -> None:
@@ -294,6 +294,9 @@ class Device:
             CybroError: In case the given API response is incomplete in a way
                 that a Device object cannot be constructed from it.
         """
+        self.vars = {}
+        self.user_vars = {}
+        self.vars_types = {}
         # Check if all elements are in the passed dict, else raise an Error
         try:
             if "var" in data:

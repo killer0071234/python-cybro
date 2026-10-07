@@ -238,7 +238,7 @@ class Cybro:
             if self._device is None:
                 self._device = Device(_data1, plc_nad=self.nad)
             else:
-                self._device.update_from_dict(_data1)
+                self._device.update_from_dict(_data1, plc_nad=self.nad)
 
             if len(self._device.user_vars) > 0:
                 _user_vars = _get_chunk(self._device.user_vars, VAR_CHUNK_SIZE)
