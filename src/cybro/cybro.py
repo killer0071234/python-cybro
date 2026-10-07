@@ -7,6 +7,7 @@ import socket
 from dataclasses import dataclass
 from itertools import islice
 from typing import Any
+from urllib.parse import quote
 
 import aiohttp
 import async_timeout
@@ -104,26 +105,10 @@ class Cybro:
                 with the scgi server.
             CybroError: Received an unexpected response from Cybro scgi server.
         """
-        if isinstance(data, str):
-            url = URL.build(
-                scheme="http",
-                host=self.host,
-                port=self.port,
-                path=self.path,
-                query_string=data,
-            )
-        else:
-            url = URL.build(
-                scheme="http",
-                host=self.host,
-                port=self.port,
-                path=self.path,
-                query=data,
-            )
-
-        # some fix of query data
-        url_fixed = str(url).replace("=&", "&").removesuffix("=")
-        url = url_fixed
+        base_url = URL.build(
+            scheme="http", host=self.host, port=self.port, path=self.path
+        )
+        url = URL(f"{base_url}?{_build_query(data)}", encoded=True)
 
         headers = {
             "Accept": "text/plain, */*",
@@ -135,7 +120,7 @@ class Cybro:
         try:
             async with async_timeout.timeout(self.request_timeout):
                 response = await self.session.get(
-                    url=url_fixed,
+                    url=url,
                     allow_redirects=False,
                     ssl=False,
                     headers=headers,
@@ -359,6 +344,33 @@ class Cybro:
         Args:
             _exc_info: Exec type.
         """
+
+
+def _build_query(data: dict | str | None) -> str:
+    """Build the query string for a scgi server request.
+
+    The scgi server does not decode variable names, so "[" and "]" of array
+    elements (e.g. c1000.dummy_int[28]) must be sent as they are. Variables to
+    read are sent without "=", variables to write as "name=value".
+
+    Args:
+        data: A query string, or a dictionary of variable names and values
+            ("" to read).
+
+    Returns:
+        The encoded query string.
+    """
+    if not data:
+        return ""
+    if isinstance(data, str):  # a ready query string, e.g. "c1000.a&c1000.b=1"
+        return quote(data, safe=".[]=&")
+    parts = []
+    for name, value in data.items():
+        part = quote(name, safe=".[]")
+        if value != "":
+            part += "=" + quote(str(value), safe="")
+        parts.append(part)
+    return "&".join(parts)
 
 
 def _get_chunk(data, chunk_size):

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from enum import IntEnum
 from typing import Any
@@ -404,14 +405,17 @@ class Device:
         """Adds a variable to the update list.
 
         Args:
-            name: Variable name to read eg: c1000.scan_time
+            name: Variable name to read eg: c1000.scan_time, or an array
+                element eg: c1000.dummy_int[28]
             var_type: Optionally defines a Variable Type
             allow_all: Optionally allow to add also non existing variables
         """
+        # an array is listed in the ALC file by its name only, without index
+        base_name = re.sub(r"\[\d+\]$", "", name)
         if (
             allow_all
             or ".sys." in name
-            or (self.plc_info is not None and name in self.plc_info.plc_vars)
+            or (self.plc_info is not None and base_name in self.plc_info.plc_vars)
         ):
             self.user_vars.update({name: ""})
             self.vars_types.update({name: var_type})

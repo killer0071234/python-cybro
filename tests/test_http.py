@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Iterator
 from unittest.mock import patch
+from urllib.parse import unquote
 from xml.sax.saxutils import escape
 
 import aiohttp
@@ -15,6 +16,7 @@ from aresponses import ResponsesMockServer
 
 from src.cybro.cybro import VAR_CHUNK_SIZE
 from src.cybro.cybro import Cybro
+from src.cybro.cybro import _build_query
 from src.cybro.exceptions import CybroConnectionError
 from src.cybro.exceptions import CybroConnectionTimeoutError
 from src.cybro.exceptions import CybroEmptyResponseError
@@ -31,6 +33,7 @@ ALC_FILE = (
     "0400  00000 1     0      2    global int   scan_time                        Last scan time [ms].\n"
     "0402  00000 1     0      2    global int   scan_time_max                    Max scan time [ms].\n"
     "0500  00000 1     0      1    global bit   cybro_qx00                       Binary output.\n"
+    "3B76  00004 31    0      2    global int   dummy_int                        Array.\n"
 )
 
 # Values as returned by a real scgi server (v3.3.1)
@@ -58,6 +61,7 @@ SERVER_VALUES: dict[str, str] = {
     f"{PREFIX}scan_time": "6",
     f"{PREFIX}scan_time_max": "22",
     f"{PREFIX}cybro_qx00": "0",
+    f"{PREFIX}dummy_int[28]": "0",
 }
 
 
@@ -65,6 +69,13 @@ def _xml_var(name: str, value: str) -> str:
     return (
         f"<var><name>{name}</name><value>{value}</value>"
         "<description>Desc.</description></var>"
+    )
+
+
+def _xml_unknown_var(name: str) -> str:
+    return (
+        f"<var><name>{name}</name><value>?</value><description />"
+        "<error_code>2</error_code></var>"
     )
 
 
@@ -79,19 +90,29 @@ class FakeScgiServer:
         self.raw_queries: list[str] = []
 
     async def handler(self, request: web.Request) -> web.Response:
-        """Read or write the requested variables."""
-        query = dict(request.query)
+        """Read or write the requested variables.
+
+        Like the real scgi server, variable names are not URL-decoded.
+        """
+        raw_query = request.rel_url.raw_query_string
+        query = {}
+        for part in raw_query.split("&") if raw_query else []:
+            name, _, value = part.partition("=")
+            query[name] = unquote(value)
         self.queries.append(query)
-        self.raw_queries.append(request.rel_url.raw_query_string)
+        self.raw_queries.append(raw_query)
         out = []
         for name, value in query.items():
             if name == "sys.nad_list":
                 items = "".join(f"<item>{nad}</item>" for nad in self.nad_list)
                 out.append(_xml_var(name, items))
                 continue
+            if name not in self.values:
+                out.append(_xml_unknown_var(escape(name)))
+                continue
             if value:
                 self.values[name] = value
-            out.append(_xml_var(name, escape(self.values.get(name, "?"))))
+            out.append(_xml_var(name, escape(self.values[name])))
         body = '<?xml version="1.0" encoding="ISO-8859-1"?><data>'
         body += "".join(out) + "</data>"
         return web.Response(text=body, content_type="text/xml", charset="iso-8859-1")
@@ -243,6 +264,7 @@ async def test_update(server: FakeScgiServer) -> None:
         f"{PREFIX}scan_time": "int",
         f"{PREFIX}scan_time_max": "int",
         f"{PREFIX}cybro_qx00": "bit",
+        f"{PREFIX}dummy_int": "int",
     }
 
 
@@ -409,6 +431,68 @@ async def test_write_var(server: FakeScgiServer) -> None:
     assert value == "1"
     assert server.queries[-1] == {f"{PREFIX}cybro_qx00": "1"}
     assert server.values[f"{PREFIX}cybro_qx00"] == "1"
+
+
+@pytest.mark.asyncio
+async def test_read_unknown_var(server: FakeScgiServer) -> None:
+    """An unknown variable is returned as "?"."""
+    cybro = Cybro(HOST, nad=NAD)
+    await cybro.update()
+    value = await cybro.read_var(f"{PREFIX}does_not_exist")
+    await cybro.disconnect()
+
+    assert value == "?"
+
+
+# --- array elements ---
+
+
+@pytest.mark.asyncio
+async def test_array_element_read_write(server: FakeScgiServer) -> None:
+    """Array elements are sent with unencoded brackets."""
+    name = f"{PREFIX}dummy_int[28]"
+    cybro = Cybro(HOST, nad=NAD)
+    await cybro.update()
+    assert await cybro.read_var(name) == "0"
+    assert await cybro.write_var(name, "123") == "123"
+    await cybro.disconnect()
+
+    assert server.values[name] == "123"
+    assert server.raw_queries[-2:] == [name, f"{name}=123"]
+
+
+@pytest.mark.asyncio
+async def test_array_element_add_var(server: FakeScgiServer) -> None:
+    """add_var() accepts elements of arrays listed in the ALC file."""
+    name = f"{PREFIX}dummy_int[28]"
+    cybro = Cybro(HOST, nad=NAD)
+    await cybro.update()
+    cybro.add_var(name)
+    cybro.add_var(f"{PREFIX}unknown_array[1]")  # not in the ALC file, ignored
+    server.values[name] = "7"
+    device = await cybro.update()
+    await cybro.disconnect()
+
+    assert list(device.user_vars) == [name]
+    assert device.vars[name].value_int() == 7
+
+
+@pytest.mark.parametrize(
+    ("data", "query"),
+    [
+        (None, ""),
+        ({}, ""),
+        ("c1.a", "c1.a"),
+        ("c1.a&c1.b=1", "c1.a&c1.b=1"),
+        ("c1.dummy_int[28]", "c1.dummy_int[28]"),
+        ({"c1.a": "", "c1.b": "1"}, "c1.a&c1.b=1"),
+        ({"c1.dummy_int[28]": 123}, "c1.dummy_int[28]=123"),
+        ({"c1.text": "a b&c"}, "c1.text=a%20b%26c"),
+    ],
+)
+def test_build_query(data: dict | str | None, query: str) -> None:
+    """The query keeps names and brackets readable and encodes values."""
+    assert _build_query(data) == query
 
 
 # --- session handling ---
