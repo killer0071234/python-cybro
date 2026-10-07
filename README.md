@@ -40,8 +40,7 @@ async def main() -> None:
     nad = 10000  # network address (NAD) of the PLC
     prefix = f"c{nad}."
 
-    cybro = Cybro("192.168.1.100", port=4000, nad=nad)
-    try:
+    async with Cybro("192.168.1.100", port=4000, nad=nad) as cybro:
         # The first update reads server and PLC information.
         # It must run before variables can be added, read or written.
         device = await cybro.update()
@@ -60,8 +59,6 @@ async def main() -> None:
         # Read and write single variables.
         print(await cybro.read_var(f"{prefix}lc00_qx00"))
         await cybro.write_var(f"{prefix}lc00_qx00", "1")
-    finally:
-        await cybro.disconnect()
 
 
 asyncio.run(main())
@@ -77,9 +74,9 @@ A longer example lives in [examples/control.py](examples/control.py).
   e.g. `http://example.com/scgi`. The scheme is ignored; requests always use HTTP.
 - `nad` is the network address of the PLC. It is needed for PLC information and for `add_var()`.
   With `nad=0` (the default), only server information is read. See [Server only (`nad=0`)](#server-only-nad0).
-- `session` lets you pass your own `aiohttp.ClientSession`. Otherwise one is created
-  on the first request. Call `await cybro.disconnect()` to close it.
-  Leaving an `async with Cybro(...)` block does **not** close the session.
+- `session` lets you pass your own `aiohttp.ClientSession`; you stay responsible
+  for closing it. Otherwise one is created on the first request and closed when
+  leaving `async with Cybro(...)` or calling `await cybro.disconnect()`.
 
 ### Reading data
 
@@ -134,7 +131,9 @@ All exceptions derive from `CybroError`, so catching it is enough:
 | `CybroPlcNotFoundError`       | The PLC information for the NAD is missing                          |
 | `CybroError`                  | Any other error, e.g. `add_var()` or `read_var()` before `update()` |
 
-Failed requests are retried up to three times before an exception is raised.
+Connection errors, timeouts and server errors (HTTP 5xx) are retried up to three
+times before an exception is raised. Client errors (HTTP 4xx) are raised immediately.
+Writes are retried too, so after a timeout a write may reach the PLC twice.
 
 ## Development
 

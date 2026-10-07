@@ -32,8 +32,7 @@ async def main(host: str, port: int, nad: int, write: str | None) -> None:
         SystemExit: The PLC is not known to the scgi server.
     """
     prefix = f"c{nad}."
-    cybro = Cybro(host, port=port, nad=nad)
-    try:
+    async with Cybro(host, port=port, nad=nad) as cybro:
         # The first update reads server and PLC information.
         device = await cybro.update()
         print("Server version:", device.server_info.server_version)
@@ -67,8 +66,6 @@ async def main(host: str, port: int, nad: int, write: str | None) -> None:
             name, value = write.split("=", 1)
             await cybro.write_var(prefix + name, value)
             print(f"\n{name} after write:", await cybro.read_var(prefix + name))
-    finally:
-        await cybro.disconnect()
 
 
 if __name__ == "__main__":

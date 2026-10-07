@@ -177,13 +177,17 @@ async def test_request_uses_path_from_host(aresponses: ResponsesMockServer) -> N
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("status", [404, 500])
-async def test_request_http_error(aresponses: ResponsesMockServer, status: int) -> None:
-    """HTTP errors raise CybroError after three attempts."""
+@pytest.mark.parametrize(
+    ("status", "attempts"), [(400, 1), (404, 1), (500, 3), (503, 3)]
+)
+async def test_request_http_error(
+    aresponses: ResponsesMockServer, status: int, attempts: int
+) -> None:
+    """Server errors are retried, client errors are not."""
     aresponses.add(
         f"{HOST}:4000",
         response=aresponses.Response(status=status, text="failure"),
-        repeat=3,
+        repeat=attempts,
     )
     cybro = Cybro(HOST, nad=NAD)
     with pytest.raises(CybroError):
@@ -222,6 +226,30 @@ async def test_request_timeout(aresponses: ResponsesMockServer) -> None:
         return web.Response(text="<data></data>")
 
     aresponses.add(f"{HOST}:4000", response=slow, repeat=3)
+    cybro = Cybro(HOST, nad=NAD)
+    cybro.request_timeout = 0.05
+    with pytest.raises(CybroConnectionTimeoutError):
+        await cybro.request(data="sys.server_version")
+    await cybro.disconnect()
+
+    aresponses.assert_plan_strictly_followed()
+
+
+@pytest.mark.asyncio
+async def test_request_timeout_while_reading_body(
+    aresponses: ResponsesMockServer,
+) -> None:
+    """The timeout also covers reading the response body."""
+
+    async def slow_body(request: web.Request) -> web.StreamResponse:
+        response = web.StreamResponse(headers={"Content-Type": "text/xml"})
+        await response.prepare(request)
+        await response.write(b"<data>")
+        await asyncio.sleep(1)
+        await response.write(b"</data>")
+        return response
+
+    aresponses.add(f"{HOST}:4000", response=slow_body, repeat=3)
     cybro = Cybro(HOST, nad=NAD)
     cybro.request_timeout = 0.05
     with pytest.raises(CybroConnectionTimeoutError):
@@ -421,6 +449,25 @@ async def test_read_var_typed(server: FakeScgiServer) -> None:
 
 
 @pytest.mark.asyncio
+async def test_read_var_typed_retries(aresponses: ResponsesMockServer) -> None:
+    """A typed read is attempted three times on an empty response, not nine."""
+    fake = FakeScgiServer()
+    aresponses.add(f"{HOST}:4000", response=fake.handler)
+    aresponses.add(
+        f"{HOST}:4000",
+        response=aresponses.Response(text="<data></data>", content_type="text/xml"),
+        repeat=3,
+    )
+    cybro = Cybro(HOST, nad=NAD)
+    await cybro.update()
+    with pytest.raises(CybroEmptyResponseError):
+        await cybro.read_var_int(f"{PREFIX}scan_time")
+    await cybro.disconnect()
+
+    aresponses.assert_plan_strictly_followed()
+
+
+@pytest.mark.asyncio
 async def test_write_var(server: FakeScgiServer) -> None:
     """A write sends name=value and returns the new value."""
     cybro = Cybro(HOST, nad=NAD)
@@ -506,6 +553,45 @@ async def test_own_session_is_used(server: FakeScgiServer) -> None:
         await cybro.request(data="sys.server_version")
 
         assert cybro.session is session
+
+
+@pytest.mark.asyncio
+async def test_own_session_is_not_closed(server: FakeScgiServer) -> None:
+    """A session passed in is left open by disconnect() and async with."""
+    async with aiohttp.ClientSession() as session:
+        async with Cybro(HOST, nad=NAD, session=session) as cybro:
+            await cybro.request(data="sys.server_version")
+        await cybro.disconnect()
+
+        assert not session.closed
+        assert cybro.session is session
+
+
+@pytest.mark.asyncio
+async def test_async_with_closes_session(server: FakeScgiServer) -> None:
+    """Leaving async with closes the session created by the library."""
+    async with Cybro(HOST, nad=NAD) as cybro:
+        await cybro.request(data="sys.server_version")
+        session = cybro.session
+
+    assert session.closed
+    assert cybro.session is None
+
+
+@pytest.mark.asyncio
+async def test_new_session_after_disconnect(server: FakeScgiServer) -> None:
+    """After disconnect(), the next request opens a new session."""
+    cybro = Cybro(HOST, nad=NAD)
+    await cybro.request(data="sys.server_version")
+    first = cybro.session
+    await cybro.disconnect()
+    await cybro.request(data="sys.server_version")
+    second = cybro.session
+    await cybro.disconnect()
+
+    assert first is not second
+    assert first.closed
+    assert second.closed
 
 
 @pytest.mark.asyncio
