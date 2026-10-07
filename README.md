@@ -1,28 +1,151 @@
 # python-cybro
 
 [![GitHub Release][releases-shield]][releases]
-[![GitHub Activity][commits-shield]][commits]
+[![PyPI][pypi-shield]][pypi]
+[![Python Versions][python-shield]][pypi]
 [![License][license-shield]](LICENSE)
 
+[![GitHub Activity][commits-shield]][commits]
+[![Code Coverage][codecov-shield]][codecov]
 [![pre-commit][pre-commit-shield]][pre-commit]
 [![Black][black-shield]][black]
-[![Code Coverage][codecov-shield]][codecov]
 
 [![Project Maintenance][maintenance-shield]][user_profile]
 
-## Functionality
+Asynchronous Python client for the [Cybrotech](https://www.cybrotech.com) scgi server.
+Use it to read and write variables of Cybro / HIQ PLCs through the scgi server's HTTP interface.
 
-Python library to communicate with a cybro scgi server
-To use this library you need to have a running scgi server (it could be a docker container or native installed).
-Further information of the docker container can be found here: [![dockerhub][scgi-docker-shield]][scgi-docker]
+## Requirements
 
-## Tested scgi server
+- Python 3.11 or newer
+- A running Cybrotech scgi server **v3.2.6** (earlier versions are not supported).
+  You can install the server natively, or run it as a Docker container:
+  [![dockerhub][scgi-docker-shield]][scgi-docker]
 
-- Cybrotech scgi server v3.2.6 (previous versions are not supported)
+## Installation
 
-## Contributions are welcome!
+```bash
+pip install cybro
+```
 
-If you want to contribute to this please read the [Contribution guidelines](https://github.com/killer0071234/python-cybro/blob/master/CONTRIBUTING.md)
+## Usage
+
+```python
+import asyncio
+
+from cybro import Cybro
+
+
+async def main() -> None:
+    nad = 10000  # network address (NAD) of the PLC
+    prefix = f"c{nad}."
+
+    cybro = Cybro("192.168.1.100", port=4000, nad=nad)
+    try:
+        # The first update reads server and PLC information.
+        # It must run before variables can be added, read or written.
+        device = await cybro.update()
+        print("Server version:", device.server_info.server_version)
+        print("Controllers:", device.server_info.nad_list)
+        print("PLC status:", device.plc_info.plc_status)
+
+        # Register variables that every following update() should refresh.
+        cybro.add_var(f"{prefix}scan_time")
+        cybro.add_var(f"{prefix}sys.response_time")
+
+        device = await cybro.update()
+        for name in device.user_vars:
+            print(name, "->", device.vars[name].value)
+
+        # Read and write single variables.
+        print(await cybro.read_var(f"{prefix}lc00_qx00"))
+        await cybro.write_var(f"{prefix}lc00_qx00", "1")
+    finally:
+        await cybro.disconnect()
+
+
+asyncio.run(main())
+```
+
+A longer example lives in [examples/control.py](examples/control.py).
+
+### Connecting
+
+`Cybro(host_str, port=4000, nad=0, session=None)`
+
+- `host_str` can be a plain host name or IP address, or a URL with a path,
+  e.g. `http://example.com/scgi`. The scheme is ignored; requests always use HTTP.
+- `nad` is the network address of the PLC. It is needed for PLC information and for `add_var()`.
+  With `nad=0` (the default), only server information is read. See [Server only (`nad=0`)](#server-only-nad0).
+- `session` lets you pass your own `aiohttp.ClientSession`. Otherwise one is created
+  on the first request. Call `await cybro.disconnect()` to close it.
+  Leaving an `async with Cybro(...)` block does **not** close the session.
+
+### Reading data
+
+`await cybro.update(full_update=False, plc_nad=0, device_type=0)` returns a `Device`:
+
+| Attribute            | Content                                                                  |
+| -------------------- | ------------------------------------------------------------------------ |
+| `device.server_info` | Server data: version, uptime, request counters, active NADs (`nad_list`) |
+| `device.plc_info`    | PLC data: IP/port, status, response time, ALC file, available variables  |
+| `device.vars`        | All read variables by name (`Var` objects)                               |
+| `device.user_vars`   | Variables registered with `add_var()`                                    |
+
+- The first call (or `full_update=True`) reads server and PLC information.
+  Later calls only refresh the variables registered with `add_var()`.
+- Set `device_type=1` for HIQ controllers to also read their HIQ-specific variables.
+- `plc_nad` sets the PLC address if none was given to `Cybro()`. It only takes effect
+  on the very first `update()` call.
+
+### Server only (`nad=0`)
+
+Without a NAD, `update()` reads only the server information. Use this to check that the
+server is reachable, or to list the controllers it knows (`device.server_info.nad_list`).
+In this mode:
+
+- `device.plc_info` is not set. Accessing it raises `AttributeError`.
+- `cybro.add_var(name)` raises `AttributeError`. Pass `allow_all=True` to register variables anyway.
+- `read_var()` and `write_var()` work with full variable names, e.g. `c10000.scan_time`.
+
+To work with a PLC, create the `Cybro` object with its NAD.
+
+### Variables
+
+- `cybro.add_var(name)` registers a variable for `update()`. Only variables listed
+  in the PLC's ALC file and system variables (`c<nad>.sys.*`) are accepted;
+  pass `allow_all=True` to add any name.
+- `cybro.remove_var(name)` removes it again.
+- `await cybro.read_var(name)` and `await cybro.write_var(name, value)` read or
+  write a single variable immediately.
+
+Values are returned as strings. Each `Var` in `device.vars` has helpers to convert them:
+`value_int()`, `value_float()` and `value_bool()`.
+
+### Errors
+
+The library raises `CybroError` and its subclasses `CybroConnectionError` and
+`CybroConnectionTimeoutError`. Failed requests are retried up to three times
+before an exception is raised.
+
+## Development
+
+The project uses [Poetry](https://python-poetry.org).
+A ready-to-use [dev container](.devcontainer) is included for VS Code.
+
+```bash
+poetry install
+poetry run pytest
+poetry run pre-commit install  # run linters before every commit
+```
+
+## Contributing
+
+Contributions are welcome! Please read the [contribution guidelines](CONTRIBUTING.md) first.
+
+## License
+
+[MIT](LICENSE)
 
 ---
 
@@ -36,6 +159,9 @@ If you want to contribute to this please read the [Contribution guidelines](http
 [pre-commit-shield]: https://img.shields.io/badge/pre--commit-enabled-brightgreen?style=for-the-badge
 [license-shield]: https://img.shields.io/github/license/killer0071234/python-cybro.svg?style=for-the-badge
 [maintenance-shield]: https://img.shields.io/badge/maintainer-@killer0071234-blue.svg?style=for-the-badge
+[pypi]: https://pypi.org/project/cybro/
+[pypi-shield]: https://img.shields.io/pypi/v/cybro.svg?style=for-the-badge
+[python-shield]: https://img.shields.io/pypi/pyversions/cybro.svg?style=for-the-badge
 [releases-shield]: https://img.shields.io/github/release/killer0071234/python-cybro.svg?style=for-the-badge
 [releases]: https://github.com/killer0071234/python-cybro/releases
 [user_profile]: https://github.com/killer0071234

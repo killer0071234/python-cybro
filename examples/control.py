@@ -1,81 +1,101 @@
-# pylint: disable=W0621
-"""Asynchronous Python client for Cybro."""
+"""Example: read and write variables of a Cybro PLC through a scgi server."""  # fmt: skip
+import argparse
 import asyncio
 
-from src.cybro.cybro import Cybro
-from src.cybro.models import VarType
+from cybro import Cybro
+from cybro import CybroError
+
+# Status variables available on every Cybro PLC, with the converter to use.
+STATUS_VARS = {
+    "scan_time": "int",
+    "scan_time_max": "int",
+    "scan_overrun": "bool",
+    "retentive_fail": "bool",
+    "general_error": "bool",
+    "sys.response_time": "int",
+    "sys.bytes_transferred": "int",
+    "sys.com_error_count": "int",
+}
 
 
-async def main():
-    """Show example on controlling a Cybro PLC."""
-    nad = 10000
+async def main(host: str, port: int, nad: int, write: str | None) -> None:
+    """Show server and PLC information, then read (and optionally write) variables.
+
+    Args:
+        host: scgi server host or IP address
+        port: scgi server port
+        nad: network address (NAD) of the PLC
+        write: optional "NAME=VALUE" to write to the PLC
+
+    Raises:
+        SystemExit: The PLC is not known to the scgi server.
+    """
     prefix = f"c{nad}."
-    async with Cybro("192.168.10.222", 4000, nad) as cybro:
-        device = await cybro.update(device_type=1)
-        print("server_version -> " + device.server_info.server_version)
-        print("nad_list -> " + str(device.server_info.nad_list))
-        print("ip_port -> " + device.plc_info.ip_port)
-        print("timestamp -> " + device.plc_info.timestamp)
-        print("plc_status -> " + device.plc_info.plc_status)
-        print("response_time -> " + device.plc_info.response_time)
-        print("bytes_transferred -> " + device.plc_info.bytes_transferred)
-        print("com_error_count -> " + device.plc_info.com_error_count)
-        # print("alc_file -> " + device.plc_info.alc_file)
+    cybro = Cybro(host, port=port, nad=nad)
+    try:
+        # The first update reads server and PLC information.
+        device = await cybro.update()
+        print("Server version:", device.server_info.server_version)
+        print("Server uptime: ", device.server_info.server_uptime)
+        print("Controllers:   ", device.server_info.nad_list)
 
-        device.add_var(f"{prefix}scan_overrun", VarType.BOOL)
-        device.add_var(f"{prefix}retentive_fail", VarType.BOOL)
-        device.add_var(f"{prefix}general_error", VarType.BOOL)
-        device.add_var(f"{prefix}lc00_general_error", VarType.BOOL)
-        device.add_var(f"{prefix}lc01_general_error", VarType.BOOL)
-        device.add_var(f"{prefix}lc02_general_error", VarType.BOOL)
-        device.add_var(f"{prefix}ld00_general_error", VarType.BOOL)
-        device.add_var(f"{prefix}ld01_general_error", VarType.BOOL)
-        device.add_var(f"{prefix}ld02_general_error", VarType.BOOL)
-        device.add_var(f"{prefix}ld03_general_error", VarType.BOOL)
-        device.add_var(f"{prefix}lc00_qx00", VarType.BOOL)
-        device.add_var(f"{prefix}lc00_qx01", VarType.BOOL)
-        device.add_var(f"{prefix}lc00_qx02", VarType.BOOL)
-        device.add_var(f"{prefix}lc00_qx03", VarType.BOOL)
-        device.add_var(f"{prefix}lc00_qx04", VarType.BOOL)
-        device.add_var(f"{prefix}lc00_qx05", VarType.BOOL)
-        device.add_var(f"{prefix}lc00_qx06", VarType.BOOL)
-        device.add_var(f"{prefix}lc00_qx07", VarType.BOOL)
-        device.add_var(f"{prefix}lc00_qx08", VarType.BOOL)
-        device.add_var(f"{prefix}lc00_qx09", VarType.BOOL)
-        device.add_var(f"{prefix}ld00_qx00", VarType.BOOL)
-        device.add_var(f"{prefix}ld00_qx01", VarType.BOOL)
-        device.add_var(f"{prefix}ld00_qx02", VarType.BOOL)
-        device.add_var(f"{prefix}ld00_qx03", VarType.BOOL)
-        device.add_var(f"{prefix}ld00_qw00", VarType.INT)
-        device.add_var(f"{prefix}ld00_qw01", VarType.INT)
-        device.add_var(f"{prefix}ld00_qw02", VarType.INT)
-        device.add_var(f"{prefix}ld00_qw03", VarType.INT)
-        device.add_var(f"{prefix}scan_time", VarType.INT)
-        device.add_var(f"{prefix}scan_time_max", VarType.INT)
-        device.add_var(f"{prefix}sys.ip_port")
-        device.add_var(f"{prefix}sys.timestamp")
-        device.add_var(f"{prefix}sys.response_time", VarType.INT)
-        device.add_var(f"{prefix}sys.bytes_transferred", VarType.INT)
-        device.add_var(f"{prefix}sys.com_error_count", VarType.INT)
-        await cybro.update()
-        for var in device.user_vars:
-            print(var + " -> " + device.vars[var].value)
+        nad_list = device.server_info.nad_list or []
+        if isinstance(nad_list, str):  # a single controller is returned as a string
+            nad_list = [nad_list]
+        if f"c{nad}" not in nad_list:
+            raise SystemExit(f"error: PLC with NAD {nad} is not known to the server")
 
-        # print(await cybro.write_var("c12762.lc00_qx00", "0"))
-        # await cybro.update()
-        # await cybro.write_var("c12762.cybro_qx05", "1")
+        print("PLC address:   ", device.plc_info.ip_port)
+        print("PLC status:    ", device.plc_info.plc_status)
+        print("PLC program:   ", device.plc_info.alc_file)
 
-        # print(await cybro.read_var("c12762.cybro_qx04"))
-        # print(await cybro.read_var("c12762.cybro_qx05"))
-        # print(await cybro.read_var("c12762.cybro_qx06"))
-        # print(await cybro.read_var("sys.abus_list"))
+        # Register variables, then refresh them with a second update.
+        for name in STATUS_VARS:
+            cybro.add_var(prefix + name)
+        device = await cybro.update()
 
-        # await cybro.update()
-        # if isinstance(device.state.preset, Preset):
-        #    print(f"Preset active! Name: {device.state.preset.name}")
+        print()
+        for name, kind in STATUS_VARS.items():
+            var = device.vars.get(prefix + name)
+            if var is None:
+                print(f"{name}: not available on this PLC")
+                continue
+            # Values are returned as strings; convert them with the Var helpers.
+            value = var.value_int() if kind == "int" else var.value_bool()
+            print(f"{name}: {value}")
 
+        if write:
+            name, value = write.split("=", 1)
+            await cybro.write_var(prefix + name, value)
+            print(f"\n{name} after write:", await cybro.read_var(prefix + name))
+    finally:
         await cybro.disconnect()
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("host", help="scgi server host or IP address")
+    parser.add_argument("nad", type=int, help="network address (NAD) of the PLC")
+    parser.add_argument("--port", type=int, default=4000, help="scgi server port")
+    parser.add_argument(
+        "--write", metavar="NAME=VALUE", help="write a PLC variable, e.g. lc00_qx00=1"
+    )
+    args = parser.parse_args()
+
+    if not args.host.strip():
+        parser.error("host must not be empty")
+    if args.nad <= 0:
+        parser.error("nad must be a positive number")
+    if not 1 <= args.port <= 65535:
+        parser.error("port must be between 1 and 65535")
+    if args.write is not None:
+        var_name, sep, _ = args.write.partition("=")
+        if not sep or not var_name.strip():
+            parser.error("--write must have the form NAME=VALUE, e.g. lc00_qx00=1")
+        if var_name.startswith(f"c{args.nad}."):
+            parser.error(f"--write NAME must not include the 'c{args.nad}.' prefix")
+
+    try:
+        asyncio.run(main(args.host, args.port, args.nad, args.write))
+    except CybroError as err:
+        raise SystemExit(f"error: {err}") from err
