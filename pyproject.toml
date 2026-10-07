@@ -15,11 +15,10 @@ classifiers = [
   "Framework :: AsyncIO",
   "Intended Audience :: Developers",
   "Natural Language :: English",
-  "Programming Language :: Python :: 3.8",
-  "Programming Language :: Python :: 3.9",
-  "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
   "Programming Language :: Python :: 3",
   "Topic :: Software Development :: Libraries :: Python Modules",
 ]
@@ -28,7 +27,7 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
-python = "^3.8"
+python = "^3.11"
 aiohttp = ">=3.8.0"
 async-timeout = "4.0.3"
 yarl = ">=1.7.2"
@@ -95,7 +94,7 @@ multi_line_output = 3
 # free to run mypy on Windows, Linux, or macOS and get consistent
 # results.
 platform = "linux"
-python_version = 3.12
+python_version = 3.11
 
 # flake8-mypy expects the two following for sensible formatting
 show_column_numbers = true
