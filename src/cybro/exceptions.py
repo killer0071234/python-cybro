@@ -5,7 +5,7 @@ class CybroError(Exception):
     """Generic Cybro exception."""
 
 
-class CybroEmptyResponseError(Exception):
+class CybroEmptyResponseError(CybroError):
     """Cybro empty API response exception."""
 
 

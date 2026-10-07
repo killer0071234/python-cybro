@@ -273,8 +273,9 @@ class Cybro:
         self, name: str, value: str, var_type: VarType = VarType.STR
     ) -> str | int | float | bool:
         """Write a single variable to scgi server."""
+        device = self._get_device()
         data = await self.request(data={name: value})
-        return self._device.update_var(data, var_type=var_type)
+        return device.update_var(data, var_type=var_type)
 
     @backoff.on_exception(
         backoff.expo, CybroEmptyResponseError, max_tries=3, logger=None
@@ -283,12 +284,13 @@ class Cybro:
         self, name: str, var_type: VarType = VarType.STR
     ) -> str | int | float | bool:
         """Read a single variable from scgi server."""
+        device = self._get_device()
         if not (data := await self.request(data=name)):
             raise CybroEmptyResponseError(
                 f"Cybro scgi server at {self.host}:{self.port} returned an empty"
-                " response on read of {name}"
+                f" response on read of {name}"
             )
-        return self._device.update_var(data, var_type=var_type)
+        return device.update_var(data, var_type=var_type)
 
     @backoff.on_exception(
         backoff.expo, CybroEmptyResponseError, max_tries=3, logger=None
@@ -325,11 +327,24 @@ class Cybro:
 
         name: Variable name to read eg: c1000.scan_time
         allow_all: Optionally allow to add also non existing variables"""
-        self._device.add_var(name, allow_all=allow_all)
+        self._get_device().add_var(name, allow_all=allow_all)
 
     def remove_var(self, name: str) -> None:
         """Remove a variable from update buffer."""
-        self._device.remove_var(name)
+        self._get_device().remove_var(name)
+
+    def _get_device(self) -> Device:
+        """Return the device data read by update().
+
+        Returns:
+            The Cybro Device data.
+
+        Raises:
+            CybroError: update() has not been called yet.
+        """
+        if self._device is None:
+            raise CybroError("No data from the scgi server yet, call update() first")
+        return self._device
 
     async def __aenter__(self) -> Cybro:
         """Async enter.
