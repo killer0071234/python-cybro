@@ -1,4 +1,5 @@
-"""Asynchronous Python client for Cybro."""  # fmt: skip
+"""Asynchronous Python client for Cybro."""
+
 from .cybro import Cybro
 from .exceptions import CybroConnectionError
 from .exceptions import CybroConnectionTimeoutError
