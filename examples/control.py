@@ -40,11 +40,8 @@ async def main(host: str, port: int, nad: int, write: str | None) -> None:
         print("Server uptime: ", device.server_info.server_uptime)
         print("Controllers:   ", device.server_info.nad_list)
 
-        nad_list = device.server_info.nad_list or []
-        if isinstance(nad_list, str):  # a single controller is returned as a string
-            nad_list = [nad_list]
         # The server lists NADs as plain numbers, e.g. "12762"
-        if str(nad) not in [str(item).removeprefix("c") for item in nad_list]:
+        if str(nad) not in device.server_info.nad_list:
             raise SystemExit(f"error: PLC with NAD {nad} is not known to the server")
 
         print("PLC address:   ", device.plc_info.ip_port)

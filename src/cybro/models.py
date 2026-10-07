@@ -10,6 +10,26 @@ from .exceptions import CybroError
 from .exceptions import CybroPlcNotFoundError
 
 
+def _parse_nad_list(value: dict[str, Any] | None) -> list[str]:
+    """Return the controllers of a parsed "sys.nad_list" value as a list.
+
+    xmltodict returns a single <item> as string, several as list and an empty
+    value as None.
+
+    Args:
+        value: Parsed value of the "sys.nad_list" variable.
+
+    Returns:
+        The NADs of all controllers known to the scgi server.
+    """
+    items = value.get("item") if isinstance(value, dict) else None
+    if items is None:
+        return []
+    if isinstance(items, list):
+        return [item for item in items if item is not None]
+    return [items]
+
+
 @dataclass
 class ServerInfo:  # pylint:
     """Cybro scgi server information."""
@@ -74,7 +94,7 @@ class ServerInfo:  # pylint:
                 server_version=data["sys.server_version"],
                 udp_rx_count=data["sys.udp_rx_count"],
                 udp_tx_count=data["sys.udp_tx_count"],
-                nad_list=data["sys.nad_list"].get("item"),
+                nad_list=_parse_nad_list(data["sys.nad_list"]),
             )
         except KeyError as err:
             raise CybroError("Not all ServerInfo tags found in data") from err
@@ -105,7 +125,7 @@ class ServerInfo:  # pylint:
                 server_version=variables.get("sys.server_version").value,
                 udp_rx_count=variables.get("sys.udp_rx_count").value,
                 udp_tx_count=variables.get("sys.udp_tx_count").value,
-                nad_list=variables.get("sys.nad_list").value.get("item"),
+                nad_list=_parse_nad_list(variables.get("sys.nad_list").value),
             )
         except AttributeError as err:
             raise CybroError("Not all ServerInfo tags found in data") from err

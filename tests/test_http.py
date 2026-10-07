@@ -247,11 +247,6 @@ async def test_update(server: FakeScgiServer) -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(
-    strict=True,
-    reason="Bug: with a single controller, nad_list is a string instead of"
-    " the declared list[str]",
-)
 async def test_update_single_controller(server: FakeScgiServer) -> None:
     """nad_list is a list, also with a single controller."""
     cybro = Cybro(HOST, nad=NAD)
@@ -259,6 +254,17 @@ async def test_update_single_controller(server: FakeScgiServer) -> None:
     await cybro.disconnect()
 
     assert device.server_info.nad_list == [str(NAD)]
+
+
+@pytest.mark.asyncio
+async def test_update_no_controller(server: FakeScgiServer) -> None:
+    """nad_list is empty when the server knows no controllers."""
+    server.nad_list = []
+    cybro = Cybro(HOST)
+    device = await cybro.update()
+    await cybro.disconnect()
+
+    assert device.server_info.nad_list == []
 
 
 @pytest.mark.asyncio
