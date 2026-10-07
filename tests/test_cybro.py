@@ -2,9 +2,11 @@
 import unittest
 from typing import Any
 from unittest import IsolatedAsyncioTestCase
+from unittest.mock import patch
 
 from src.cybro.cybro import _add_hiq_tags
 from src.cybro.cybro import _get_chunk
+from src.cybro.cybro import Cybro
 from src.cybro.exceptions import CybroError
 from src.cybro.exceptions import CybroPlcNotFoundError
 from src.cybro.models import Device
@@ -294,6 +296,38 @@ class TestCybro(IsolatedAsyncioTestCase):
         device = Device(api_resp(), 1000)
         device.add_var("c1000.scan_time", 0)
         self.assertIsInstance(device, Device)
+
+    def test_device_vars_not_shared(self) -> None:
+        """Each device has its own variable lists."""
+        device1 = Device(api_resp(), 1000)
+        device2 = Device(api_resp(), 1000)
+        device1.add_var("c1000.sys.response_time")
+        self.assertIn("c1000.sys.response_time", device1.user_vars)
+        self.assertNotIn("c1000.sys.response_time", device2.user_vars)
+        self.assertIsNot(device1.vars, device2.vars)
+        self.assertIsNot(device1.vars_types, device2.vars_types)
+
+    async def test_full_update_refreshes_plc_info(self) -> None:
+        """A full update reads the PLC information again."""
+        values = var_dict()
+
+        async def fake_request(data: dict[str, str]) -> dict:
+            return {
+                "var": [
+                    {"name": k, "value": values[k], "description": "Desc."}
+                    for k in data
+                    if k in values
+                ]
+            }
+
+        cybro = Cybro("127.0.0.1", 4000, 1000)
+        with patch.object(cybro, "request", side_effect=fake_request):
+            device = await cybro.update()
+            self.assertEqual(device.plc_info.plc_status, "ok")
+
+            values["c1000.sys.plc_status"] = "offline"
+            device = await cybro.update(full_update=True)
+            self.assertEqual(device.plc_info.plc_status, "offline")
 
     def test_device_remove_var(self) -> None:
         """Remove a single var."""
