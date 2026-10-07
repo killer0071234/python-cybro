@@ -173,11 +173,6 @@ async def test_request_http_error(aresponses: ResponsesMockServer, status: int) 
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(
-    strict=True,
-    reason="Bug: request() compares the full Content-Type header, so"
-    " 'application/json; charset=utf-8' is not recognised as JSON",
-)
 async def test_request_http_error_json(aresponses: ResponsesMockServer) -> None:
     """A JSON error body is passed on in the exception."""
     aresponses.add(
@@ -303,11 +298,6 @@ async def test_update_user_vars(server: FakeScgiServer) -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(
-    strict=True,
-    reason="Bug: update_user_var_from_dict() stores Var(None, None, None)"
-    " when a response contains exactly one variable",
-)
 async def test_update_single_user_var(server: FakeScgiServer) -> None:
     """A single registered variable gets its value."""
     cybro = Cybro(HOST, nad=NAD)

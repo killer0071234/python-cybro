@@ -345,11 +345,11 @@ class Device:
         """
         # update user variable
         try:
-            for _var in data["var"]:
-                if _var == "name":
-                    self.vars.update({data["var"]["name"]: Var.from_dict(data)})
-                else:
-                    self.vars.update({_var["name"]: Var.from_dict(_var)})
+            _vars = data["var"]
+            if isinstance(_vars, dict):  # a single variable is not in a list
+                _vars = [_vars]
+            for _var in _vars:
+                self.vars.update({_var["name"]: Var.from_dict(_var)})
         except (KeyError, TypeError):
             pass
         return self

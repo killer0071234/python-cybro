@@ -224,7 +224,8 @@ class TestCybro(IsolatedAsyncioTestCase):
         device.update_user_var_from_dict(
             {"var": {"name": "c1000.scan_time", "value": "2", "description": "Desc."}}
         )
-        self.assertIsInstance(device, Device)
+        self.assertEqual(device.vars["c1000.scan_time"].value, "2")
+        self.assertEqual(device.vars["c1000.scan_time"].name, "c1000.scan_time")
 
     def test_device_update_from_dict(self) -> None:
         """Update a variable from user var."""
