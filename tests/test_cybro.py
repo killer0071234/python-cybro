@@ -16,6 +16,7 @@ from src.cybro.models import Device
 from src.cybro.models import PlcInfo
 from src.cybro.models import ServerInfo
 from src.cybro.models import Var
+from src.cybro.models import VarType
 
 
 def var_dict() -> dict[str, str]:
@@ -261,6 +262,46 @@ class TestCybro(IsolatedAsyncioTestCase):
             }
         )
         self.assertEqual(ret_val, "2")
+
+    def test_device_update_var_typed(self) -> None:
+        """update_var converts the value to the requested type."""
+        device = Device(api_resp(), 1000)
+        cases = [
+            (VarType.STR, "12", "12"),
+            (VarType.INT, "12", 12),
+            (VarType.FLOAT, "12.5", 12.5),
+            (VarType.BOOL, "1", True),
+            (VarType.BOOL, "0", False),
+        ]
+        for var_type, raw, expected in cases:
+            ret_val = device.update_var(
+                {"var": {"name": "c1000.scan_time", "value": raw}}, var_type
+            )
+            self.assertEqual(ret_val, expected)
+            self.assertIs(type(ret_val), type(expected))
+            # the stored Var keeps the raw string
+            self.assertEqual(device.vars["c1000.scan_time"].value, raw)
+
+    def test_device_update_var_typed_not_convertible(self) -> None:
+        """A value that cannot be converted is returned as "?"."""
+        device = Device(api_resp(), 1000)
+        for var_type in (VarType.INT, VarType.FLOAT, VarType.BOOL):
+            ret_val = device.update_var(
+                {
+                    "var": {
+                        "name": "c1000.scan_time",
+                        "value": "?",
+                        "error_code": "2",
+                    }
+                },
+                var_type,
+            )
+            self.assertEqual(ret_val, "?")
+        for var_type in (VarType.INT, VarType.FLOAT):
+            ret_val = device.update_var(
+                {"var": {"name": "c1000.scan_time", "value": "abc"}}, var_type
+            )
+            self.assertEqual(ret_val, "?")
 
     def test_device_update_var_invalid(self) -> None:
         """Update a single var."""

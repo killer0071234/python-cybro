@@ -408,7 +408,8 @@ class Device:
             var_type: Type of read variable (default = str)
 
         Returns:
-            The value of the var
+            The value of the var, converted to var_type; "?" if the server
+            returned no value or one that cannot be converted
         """
         try:
             for _var in data["var"]:
@@ -419,7 +420,7 @@ class Device:
                     continue
                 self.vars_types.update({_var["name"]: var_type})
                 self.user_vars.update({_var["name"]: ""})
-                return self.vars[_var["name"]].value
+                return _convert_value(self.vars[_var["name"]], var_type)
         except (KeyError, TypeError):
             pass
         return "?"
@@ -492,3 +493,30 @@ class VarType(IntEnum):
     INT = 1
     FLOAT = 2
     BOOL = 3
+
+
+def _convert_value(var: Var, var_type: VarType) -> str | int | float | bool:
+    """Return the value of a variable as var_type.
+
+    The scgi server returns "?" for unknown or unreadable variables. Such a
+    value is returned as it is, for every type.
+
+    Args:
+        var: The variable read from the scgi server.
+        var_type: Type to convert the value to.
+
+    Returns:
+        The converted value, or "?" if it cannot be converted.
+    """
+    if var.value == "?":
+        return "?"
+    try:
+        if var_type == VarType.INT:
+            return var.value_int()
+        if var_type == VarType.FLOAT:
+            return var.value_float()
+        if var_type == VarType.BOOL:
+            return var.value_bool()
+    except ValueError:
+        return "?"
+    return var.value

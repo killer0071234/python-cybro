@@ -117,6 +117,9 @@ To work with a PLC, create the `Cybro` object with its NAD.
 - `cybro.remove_var(name)` removes it again.
 - `await cybro.read_var(name)` and `await cybro.write_var(name, value)` read or
   write a single variable immediately.
+- `await cybro.read_var_int(name)`, `read_var_float(name)` and `read_var_bool(name)`
+  return the value as `int`, `float` or `bool`. They return `"?"` if the variable is
+  unknown or its value cannot be converted.
 
 Values are returned as strings. Each `Var` in `device.vars` has helpers to convert them:
 `value_int()`, `value_float()` and `value_bool()`.

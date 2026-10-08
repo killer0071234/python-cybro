@@ -502,11 +502,6 @@ async def test_read_var(server: FakeScgiServer) -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(
-    strict=True,
-    reason="Bug: read_var_int/float/bool return the raw string instead of"
-    " int, float and bool",
-)
 async def test_read_var_typed(server: FakeScgiServer) -> None:
     """The typed read methods return int, float and bool."""
     cybro = Cybro(HOST, nad=NAD)
@@ -523,6 +518,34 @@ async def test_read_var_typed(server: FakeScgiServer) -> None:
     assert value_float == 6.0
     assert isinstance(value_float, float)
     assert value_bool is False
+
+
+@pytest.mark.asyncio
+async def test_read_var_typed_true(server: FakeScgiServer) -> None:
+    """read_var_bool returns True for "1"."""
+    server.values[f"{PREFIX}scan_overrun"] = "1"
+    cybro = Cybro(HOST, nad=NAD)
+    await cybro.update()
+    value = await cybro.read_var_bool(f"{PREFIX}scan_overrun")
+    await cybro.disconnect()
+
+    assert value is True
+
+
+@pytest.mark.asyncio
+async def test_read_var_typed_unknown(server: FakeScgiServer) -> None:
+    """A typed read of an unknown variable returns "?" instead of raising."""
+    name = f"{PREFIX}does_not_exist"
+    cybro = Cybro(HOST, nad=NAD)
+    await cybro.update()
+    values = [
+        await cybro.read_var_int(name),
+        await cybro.read_var_float(name),
+        await cybro.read_var_bool(name),
+    ]
+    await cybro.disconnect()
+
+    assert values == ["?", "?", "?"]
 
 
 @pytest.mark.asyncio
