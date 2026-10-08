@@ -33,7 +33,7 @@ jobs:
           poetry env use "${{ steps.python.outputs.python-path }}"
           poetry install --no-interaction
       - name: ⤵️ Restore cached pre-commit environments
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/pre-commit
           key: pre-commit-${{ steps.python.outputs.python-version }}-${{ hashFiles('.pre-commit-config.yaml') }}
