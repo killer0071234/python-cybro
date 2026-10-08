@@ -289,6 +289,27 @@ class Var:
         return float(self.value)
 
 
+@dataclass
+class VarInfo:
+    """Type and description of a PLC variable, from "c<nad>.sys.variables"."""
+
+    name: str
+    """name of variable"""
+    type: str
+    """data type of variable, e.g. "datatype.bit" """
+    description: str | None
+    """description of the variable"""
+
+    @staticmethod
+    def from_dict(data: dict[str, Any]) -> VarInfo:
+        """Split a dict with "name", "type" and "description" into a VarInfo object."""
+        return VarInfo(
+            name=data["name"],
+            type=data.get("type") or "",
+            description=data.get("description"),
+        )
+
+
 class Device:
     """Object holding all information of Cybro scgi server."""
 
@@ -297,6 +318,8 @@ class Device:
     plc_info: PlcInfo | None
     vars: dict[str, Var]
     """list of variable / value / descriptions (after read/write)"""
+    var_info: dict[str, VarInfo]
+    """type and description of all PLC variables (from "c<nad>.sys.variables")"""
     user_vars: dict[str, str]
     """list of all variables to periodically update"""
     vars_types: dict[str, int]
@@ -315,6 +338,7 @@ class Device:
         """
         self.plc_info = None
         self.vars = {}
+        self.var_info = {}
         self.user_vars = {}
         self.vars_types = {}
         # Check if all elements are in the passed dict, else raise an Error
@@ -343,8 +367,8 @@ class Device:
         """
         # update server info
         for var in data["var"]:
-            self.vars.update({var["name"]: Var.from_dict(var)})
-            self.vars_types.update({var["name"]: 0})
+            if self._store_var(var):
+                self.vars_types.update({var["name"]: 0})
         self.server_info = ServerInfo.from_vars(self.vars)
         self.info = "CybrotechScgiServer v" + self.server_info.server_version
 
@@ -370,7 +394,7 @@ class Device:
             if isinstance(_vars, dict):  # a single variable is not in a list
                 _vars = [_vars]
             for _var in _vars:
-                self.vars.update({_var["name"]: Var.from_dict(_var)})
+                self._store_var(_var)
         except (KeyError, TypeError):
             pass
         return self
@@ -391,13 +415,44 @@ class Device:
                 if _var == "name":
                     # single var entry found
                     _var = data["var"]
-                self.vars.update({_var["name"]: Var.from_dict(_var)})
+                if not self._store_var(_var):
+                    continue
                 self.vars_types.update({_var["name"]: var_type})
                 self.user_vars.update({_var["name"]: ""})
                 return self.vars[_var["name"]].value
         except (KeyError, TypeError):
             pass
         return "?"
+
+    def _store_var(self, data: dict[str, Any]) -> bool:
+        """Store one variable entry of a scgi server response.
+
+        "c<nad>.sys.variables" is answered with name, type and description of
+        every PLC variable, but without value. These entries go to var_info and
+        never replace a value in vars, whatever their order in the response.
+
+        Args:
+            data: One "var" entry of the response.
+
+        Returns:
+            True if the entry holds a value and was stored in vars.
+        """
+        name = data["name"]
+        if "value" not in data:
+            info = VarInfo.from_dict(data)
+            self.var_info[name] = info
+            read_var = self.vars.get(name)
+            if read_var is not None and not read_var.description and info.description:
+                read_var.description = info.description
+            return False
+        var = Var.from_dict(data)
+        if var.value is None:  # an empty <value/> is parsed as None
+            var.value = ""
+        listed = self.var_info.get(name)
+        if not var.description and listed is not None and listed.description:
+            var.description = listed.description
+        self.vars[name] = var
+        return True
 
     def add_var(
         self, name: str, var_type: VarType = 0, allow_all: bool = False

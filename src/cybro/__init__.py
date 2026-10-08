@@ -9,6 +9,7 @@ from .exceptions import CybroPlcNotFoundError
 from .models import Device
 from .models import ServerInfo
 from .models import Var
+from .models import VarInfo
 from .models import VarType
 
 __all__ = [
@@ -16,6 +17,7 @@ __all__ = [
     "ServerInfo",
     "VarType",
     "Var",
+    "VarInfo",
     "Cybro",
     "CybroConnectionError",
     "CybroConnectionTimeoutError",
