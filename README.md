@@ -83,12 +83,13 @@ A longer example lives in [examples/control.py](examples/control.py).
 
 `await cybro.update(full_update=False, plc_nad=0, device_type=0)` returns a `Device`:
 
-| Attribute            | Content                                                                  |
-| -------------------- | ------------------------------------------------------------------------ |
-| `device.server_info` | Server data: version, uptime, request counters, active NADs (`nad_list`) |
-| `device.plc_info`    | PLC data: IP/port, status, response time, ALC file, available variables  |
-| `device.vars`        | All read variables by name (`Var` objects)                               |
-| `device.user_vars`   | Variables registered with `add_var()`                                    |
+| Attribute            | Content                                                                                 |
+| -------------------- | --------------------------------------------------------------------------------------- |
+| `device.server_info` | Server data: version, uptime, request counters, active NADs (`nad_list`)                |
+| `device.plc_info`    | PLC data: IP/port, status, response time, ALC file, available variables                 |
+| `device.vars`        | All read variables by name (`Var` objects); only variables that have been read          |
+| `device.var_info`    | Type and description of every PLC variable (`VarInfo` objects), values are not included |
+| `device.user_vars`   | Variables registered with `add_var()`                                                   |
 
 - The first call (or `full_update=True`) reads server and PLC information.
   Later calls only refresh the variables registered with `add_var()`.

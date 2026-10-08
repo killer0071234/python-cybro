@@ -56,19 +56,43 @@ SERVER_VALUES: dict[str, str] = {
     f"{PREFIX}sys.bytes_transferred": "5585774",
     f"{PREFIX}sys.com_error_count": "0",
     f"{PREFIX}sys.alc_file": ALC_FILE,
-    f"{PREFIX}sys.variables": "",
     f"{PREFIX}scan_overrun": "0",
     f"{PREFIX}scan_time": "6",
     f"{PREFIX}scan_time_max": "22",
     f"{PREFIX}cybro_qx00": "0",
     f"{PREFIX}dummy_int[28]": "0",
+    f"{PREFIX}lc00_general_error": "0",
+    f"{PREFIX}lc01_general_error": "1",
+}
+
+# Like a real scgi server, PLC variables are returned without description
+NO_DESCRIPTION: set[str] = {
+    f"{PREFIX}lc00_general_error",
+    f"{PREFIX}lc01_general_error",
+}
+
+# Answer to "c<nad>.sys.variables": name, type and description, but no value
+VARIABLE_LIST: dict[str, tuple[str, str]] = {
+    f"{PREFIX}cybro_ix00": ("datatype.bit", "Binary input (0-open, 1-closed)."),
+    f"{PREFIX}cybro_ix01": ("datatype.bit", "Binary input (0-open, 1-closed)."),
+    f"{PREFIX}scan_time": ("datatype.int", "Last scan time [ms]."),
+    f"{PREFIX}lc00_general_error": ("datatype.bit", "Combined system error."),
+    f"{PREFIX}lc01_general_error": ("datatype.bit", "Combined system error."),
+    f"{PREFIX}general_error": ("datatype.bit", ""),
 }
 
 
-def _xml_var(name: str, value: str) -> str:
+def _xml_var(name: str, value: str, description: str = "Desc.") -> str:
     return (
         f"<var><name>{name}</name><value>{value}</value>"
-        "<description>Desc.</description></var>"
+        f"<description>{description}</description></var>"
+    )
+
+
+def _xml_var_info(name: str, var_type: str, description: str) -> str:
+    return (
+        f"<var><name>{name}</name><type>{var_type}</type>"
+        f"<description>{description}</description></var>"
     )
 
 
@@ -102,7 +126,15 @@ class FakeScgiServer:
         self.queries.append(query)
         self.raw_queries.append(raw_query)
         out = []
+        var_list = []
         for name, value in query.items():
+            if name == f"{PREFIX}sys.variables":
+                # the real server appends the list after all requested values
+                var_list = [
+                    _xml_var_info(var, var_type, description)
+                    for var, (var_type, description) in VARIABLE_LIST.items()
+                ]
+                continue
             if name == "sys.nad_list":
                 items = "".join(f"<item>{nad}</item>" for nad in self.nad_list)
                 out.append(_xml_var(name, items))
@@ -112,9 +144,10 @@ class FakeScgiServer:
                 continue
             if value:
                 self.values[name] = value
-            out.append(_xml_var(name, escape(self.values[name])))
+            description = "" if name in NO_DESCRIPTION else "Desc."
+            out.append(_xml_var(name, escape(self.values[name]), description))
         body = '<?xml version="1.0" encoding="ISO-8859-1"?><data>'
-        body += "".join(out) + "</data>"
+        body += "".join(out + var_list) + "</data>"
         return web.Response(text=body, content_type="text/xml", charset="iso-8859-1")
 
 
@@ -391,6 +424,50 @@ async def test_update_hiq(server: FakeScgiServer) -> None:
     requested = {name for query in server.queries for name in query}
     assert f"{PREFIX}hvac_mode" in requested
     assert f"{PREFIX}lc00_general_error" in requested
+
+
+@pytest.mark.asyncio
+async def test_update_variable_list_keeps_values(server: FakeScgiServer) -> None:
+    """The "sys.variables" list never replaces or adds variable values."""
+    cybro = Cybro(HOST, nad=NAD)
+    for full_update in (False, True):
+        device = await cybro.update(full_update=full_update, device_type=1)
+        assert device.vars[f"{PREFIX}lc00_general_error"].value == "0"
+        assert device.vars[f"{PREFIX}lc01_general_error"].value == "1"
+        assert [name for name, var in device.vars.items() if var.value is None] == []
+        # listed, but not read: no entry in vars
+        assert f"{PREFIX}cybro_ix00" not in device.vars
+        assert f"{PREFIX}general_error" not in device.vars
+    await cybro.disconnect()
+
+
+@pytest.mark.asyncio
+async def test_update_variable_list_info(server: FakeScgiServer) -> None:
+    """Type and description of all PLC variables are kept in var_info."""
+    cybro = Cybro(HOST, nad=NAD)
+    device = await cybro.update(device_type=1)
+
+    info = device.var_info[f"{PREFIX}cybro_ix00"]
+    assert info.name == f"{PREFIX}cybro_ix00"
+    assert info.type == "datatype.bit"
+    assert info.description == "Binary input (0-open, 1-closed)."
+    assert device.var_info[f"{PREFIX}general_error"].description is None
+    # variables read without description get the one from the list
+    error = device.vars[f"{PREFIX}lc00_general_error"]
+    assert error.description == "Combined system error."
+    # a description sent with the value is kept
+    assert device.vars["sys.server_version"].description == "Desc."
+
+    cybro.add_var(f"{PREFIX}scan_time")
+    await cybro.update()
+    await cybro.read_var(f"{PREFIX}lc01_general_error")
+    await cybro.disconnect()
+    assert device.vars[f"{PREFIX}scan_time"].value == "6"
+    assert device.vars[f"{PREFIX}scan_time"].description == "Desc."
+    assert (
+        device.vars[f"{PREFIX}lc01_general_error"].description
+        == "Combined system error."
+    )
 
 
 @pytest.mark.asyncio

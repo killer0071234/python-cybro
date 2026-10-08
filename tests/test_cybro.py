@@ -268,6 +268,28 @@ class TestCybro(IsolatedAsyncioTestCase):
         ret_val = device.update_var({""})
         self.assertEqual(ret_val, "?")
 
+    def test_device_variable_list(self) -> None:
+        """Entries of "sys.variables" (no value) only go to var_info."""
+        info = {
+            "name": "c1000.scan_time",
+            "type": "datatype.int",
+            "description": "Last scan time [ms].",
+        }
+        value = {"name": "c1000.scan_time", "value": "2", "description": None}
+        unread = {"name": "c1000.cybro_ix00", "type": "datatype.bit"}
+        for entries in ([info, value, unread], [value, info, unread]):
+            data = api_resp()
+            data["var"] = data["var"] + entries
+            device = Device(data, 1000)
+            self.assertEqual(device.vars["c1000.scan_time"].value, "2")
+            self.assertEqual(
+                device.vars["c1000.scan_time"].description, "Last scan time [ms]."
+            )
+            self.assertNotIn("c1000.cybro_ix00", device.vars)
+            self.assertEqual(device.var_info["c1000.cybro_ix00"].type, "datatype.bit")
+            self.assertIsNone(device.var_info["c1000.cybro_ix00"].description)
+            self.assertNotIn("c1000.cybro_ix00", device.vars_types)
+
     def test_device_add_var(self) -> None:
         """Add a single var."""
         device = Device(api_resp(), 1000)
