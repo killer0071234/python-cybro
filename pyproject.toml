@@ -51,7 +51,7 @@ yamllint = "^1.35.1"
 
 [tool.poetry.urls]
 "Bug Tracker" = "https://github.com/killer0071234/python-cybro/issues"
-Changelog = "https://github.com/killer0071234/python-cybro/releases"
+Changelog = "https://github.com/killer0071234/python-cybro/blob/main/CHANGELOG.md"
 
 [tool.coverage.paths]
 source = ["src"]
