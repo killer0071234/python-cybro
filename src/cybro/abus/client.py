@@ -9,13 +9,20 @@ from __future__ import annotations
 import asyncio
 import struct
 import time
+from collections.abc import Callable
+from collections.abc import Iterable
+from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import datetime
 from enum import IntEnum
+from typing import TypeVar
 
 from ..exceptions import AbusError
 from ..exceptions import CybroConnectionTimeoutError
+from .alc import AlcVar
 from .alc import unzip_alc
+from .frame import MAX_FRAME_BYTES
+from .frame import OVERHEAD
 from .frame import Command
 from .frame import Direction
 from .frame import Frame
@@ -35,6 +42,10 @@ _FILE_INFO = struct.Struct("<LH")
 _SCAN_OVERRUN = struct.Struct("<H")
 _SCAN_OVERRUN_OFFSET = 0x38
 _FILE_DESCRIPTOR = struct.Struct("<32sH3L")
+_COUNTS = struct.Struct("<3H")
+_PARAMS_BYTES = MAX_FRAME_BYTES - OVERHEAD
+
+T = TypeVar("T")
 
 
 class AbusResponseError(AbusError):
@@ -278,3 +289,61 @@ class AbusClient:
             raise AbusError(f"c{self.nad} has no alc.zip")
         data = await self.read_code(alc.address, alc.size)
         return await asyncio.get_running_loop().run_in_executor(None, unzip_alc, data)
+
+    async def read_random(self, variables: Iterable[AlcVar]) -> dict[str, int | float]:
+        """Read variables, in as few frames of max. MAX_FRAME_BYTES as possible."""
+        values: dict[str, int | float] = {}
+        ordered = sorted(variables, key=_size)
+        for part in _split(ordered, lambda _: 2, _size):
+            body = await self.call(Command.READ_RANDOM, _addresses(part))
+            need = sum(var.size for var in part)
+            if len(body) < need:
+                raise AbusError(f"read_random: got {len(body)} bytes, need {need}")
+            pos = 0
+            for var in part:
+                values[var.name] = struct.unpack_from(var.data_type.fmt, body, pos)[0]
+                pos += var.size
+        return values
+
+    async def write_random(self, items: Iterable[tuple[AlcVar, int | float]]) -> None:
+        """Write (variable, value) pairs, split like read_random()."""
+        ordered = sorted(items, key=lambda item: _size(item[0]))
+        for part in _split(ordered, lambda item: 2 + item[0].size, lambda _: 0):
+            params = _addresses([var for var, _ in part]) + b"".join(
+                struct.pack(var.data_type.fmt, value) for var, value in part
+            )
+            await self.call(Command.WRITE_RANDOM, params)
+
+
+def _size(var: AlcVar) -> int:
+    if var.data_type is None:
+        raise AbusError(f"{var.name}: variable type can't be read or written")
+    return var.size
+
+
+def _addresses(variables: list[AlcVar]) -> bytes:
+    """Return the counts per size and the addresses (variables sorted by size)."""
+    counts = [sum(1 for var in variables if var.size == size) for size in (1, 2, 4)]
+    return _COUNTS.pack(*counts) + struct.pack(
+        f"<{len(variables)}H", *(var.address for var in variables)
+    )
+
+
+def _split(
+    items: list[T], request_bytes: Callable[[T], int], reply_bytes: Callable[[T], int]
+) -> Iterator[list[T]]:
+    """Yield parts whose request and reply parameters fit in one frame."""
+    part: list[T] = []
+    request, reply = _COUNTS.size, 0
+    for item in items:
+        more_request, more_reply = request_bytes(item), reply_bytes(item)
+        if part and (
+            request + more_request > _PARAMS_BYTES or reply + more_reply > _PARAMS_BYTES
+        ):
+            yield part
+            part, request, reply = [], _COUNTS.size, 0
+        part.append(item)
+        request += more_request
+        reply += more_reply
+    if part:
+        yield part

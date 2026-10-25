@@ -33,6 +33,7 @@ _FILE_TABLE_ADDR = HEAD_ADDR + 0x100
 _FILES_ADDR = HEAD_ADDR + 0x200
 _FIRST_VAR_ADDR = 0x0100
 _DATA_SIZE = 0x10000
+MAX_UDP_PAYLOAD = 1472
 
 
 @dataclass
@@ -83,6 +84,8 @@ class FakeAbusController(asyncio.DatagramProtocol):
         self.plc_status = PlcStatus.RUN
         self.silent = False  # True: never answer
         self.drop = 0  # number of requests to leave unanswered
+        self.truncate_replies = False  # True: answer READ_RANDOM with 1 byte too few
+        self.reply_sizes: list[int] = []
         self.requests: list[Frame] = []
         self.code = bytearray()
         self.data = bytearray(_DATA_SIZE)
@@ -207,7 +210,9 @@ class FakeAbusController(asyncio.DatagramProtocol):
         else:
             direction, body = self._handle(command, frame.body[1:])
         answer = Frame(self.nad, frame.from_nad, frame.txn, direction, 0, body)
-        self._transport.sendto(encode(answer), addr)
+        self.reply_sizes.append(answer.size)
+        if answer.size <= MAX_UDP_PAYLOAD:  # bigger answers are lost (spike S6)
+            self._transport.sendto(encode(answer), addr)
 
     def _handle(self, command: int, params: bytes) -> tuple[Direction, bytes]:
         if command == Command.PING:
@@ -222,7 +227,29 @@ class FakeAbusController(asyncio.DatagramProtocol):
             return Direction.ACK, bytes(self.code[start : start + size]).ljust(
                 size, b"\xff"
             )
+        if command in (Command.READ_RANDOM, Command.WRITE_RANDOM):
+            return self._random(command, params)
         return Direction.BAD_CMD, b""
+
+    def _random(self, command: int, params: bytes) -> tuple[Direction, bytes]:
+        counts = struct.unpack_from("<3H", params)
+        sizes = [
+            size
+            for size, count in zip((1, 2, 4), counts, strict=True)
+            for _ in range(count)
+        ]
+        addresses = struct.unpack_from(f"<{len(sizes)}H", params, 6)
+        if command == Command.READ_RANDOM:
+            body = b"".join(
+                self.data[address : address + size]
+                for address, size in zip(addresses, sizes, strict=True)
+            )
+            return Direction.ACK, body[:-1] if self.truncate_replies else body
+        pos = 6 + 2 * len(sizes)
+        for address, size in zip(addresses, sizes, strict=True):
+            self.data[address : address + size] = params[pos : pos + size]
+            pos += size
+        return Direction.ACK, b""
 
 
 def _zip(name: str, data: bytes) -> bytes:
