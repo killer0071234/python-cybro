@@ -12,16 +12,19 @@
 
 [![Project Maintenance][maintenance-shield]][user_profile]
 
-Asynchronous Python client for the [Cybrotech](https://www.cybrotech.com) scgi server.
-Use it to read and write variables of Cybro / HIQ PLCs through the scgi server's HTTP interface.
+Asynchronous Python client for Cybro / HIQ PLCs by [Cybrotech](https://www.cybrotech.com).
+Read and write PLC variables through the scgi server's HTTP interface (`Cybro`), or
+talk to the controllers directly over A-bus/UDP without any server (`CybroDirect`).
 
 ## Requirements
 
 - Python 3.11 or newer
-- A running Cybrotech scgi server **v3.2.6 or newer** (tested with v3.2.6 and v3.3.1;
-  earlier versions are not supported).
+- For `Cybro`: a running Cybrotech scgi server **v3.2.6 or newer** (tested with v3.2.6
+  and v3.3.1; earlier versions are not supported).
   You can install the server natively, or run it as a Docker container:
   [![dockerhub][scgi-docker-shield]][scgi-docker]
+- For `CybroDirect`: the controllers in the same broadcast domain (UDP port 8442).
+  In Docker, use host networking.
 
 ## Installation
 
@@ -139,6 +142,64 @@ All exceptions derive from `CybroError`, so catching it is enough:
 Connection errors, timeouts and server errors (HTTP 5xx) are retried up to three
 times before an exception is raised. Client errors (HTTP 4xx) are raised immediately.
 Writes are retried too, so after a timeout a write may reach the PLC twice.
+
+## Direct mode (no scgi server)
+
+`CybroDirect` has the same API as `Cybro` and returns the same `Device`, but talks
+to the controller directly over A-bus (UDP port 8442). All controllers share one
+`AbusTransport` (one UDP socket):
+
+```python
+import asyncio
+
+from cybro import CybroDirect
+from cybro.abus import AbusTransport
+from cybro.abus import scan
+
+
+async def main() -> None:
+    transport = await AbusTransport.create()  # binds UDP 8442
+    try:
+        for found in await scan(transport):  # who is on the LAN?
+            print(found.nad, found.ip, found.status.plc.name)
+
+        cybro = CybroDirect(transport, nad=10000)  # IP found by broadcast
+        device = await cybro.update()
+        cybro.add_var("c10000.scan_time")
+        device = await cybro.update()
+        print(device.vars["c10000.scan_time"].value)
+        await cybro.write_var("c10000.lc00_qx00", "1")
+    finally:
+        transport.close()
+
+
+asyncio.run(main())
+```
+
+- `AbusTransport.create()` binds UDP 8442 and raises `OSError` if the port is in use
+  (e.g. by an scgi server on the same host). `AbusTransport.create(("0.0.0.0", 0))`
+  binds any free port: requests work, but frames the controllers send on their own
+  are not received.
+- `CybroDirect(transport, nad, ip=None, password=None)`: without `ip`, the controller
+  is found by broadcast, and found again after a timeout. A static `ip` is always used.
+  `password` is the A-bus password, if the controller has one.
+- Every request reads the program head and status first. After a program change,
+  the allocation table (ALC) is downloaded again; otherwise it is kept in memory.
+- Values are formatted like the scgi server does (e.g. a REAL `-1512.10107421875`).
+  `c<nad>.sys.*` values are created by the library; `sys.server_version` is
+  `direct <version>`.
+- Differences to `Cybro`: a controller that doesn't answer raises
+  `CybroConnectionTimeoutError` (there's no server to answer instead). An invalid
+  write (unknown variable, value out of range) raises `CybroError`. Requests are not
+  retried with backoff; the transport resends each frame up to three times
+  (200 ms timeout).
+- `scan()` sends READ_STATUS to NAD 0; every controller answers with its NAD, IP and
+  status. `locate(transport, nad)` returns the IP of one controller.
+- Tests: `cybro.testing.FakeAbusController` is a fake controller on UDP with
+  variables, an ALC, an optional password and socket/push frames.
+
+The A-bus protocol code is ported from the Cybro Edge Toolkit (scgi_server) with
+the permission of Cybrotech.
 
 ## Development
 
