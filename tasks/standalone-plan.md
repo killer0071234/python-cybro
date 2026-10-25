@@ -214,8 +214,8 @@ Sizes: S ≈ ≤ 1 file / few hours, M ≈ 2–4 files / ~1 day.
       _Done when:_ reading 300 variables gives the same values as the SCGI server
       (one live comparison script). Writing a test variable round-trips.
 
-**Checkpoint 1:** python-cybro `pytest` + lint green (done). Open: hardware
-checks of T3–T5 with `scripts/abus_probe.py info` and `scripts/abus_compare.py`. Live comparison script:
+**Checkpoint 1:** python-cybro `pytest` + lint green (done). Hardware checks
+of T3–T5 passed 2026-10-25 (docs/abus-notes.md). Open: `abus_compare.py --all`. Live comparison script:
 direct vs SCGI values identical for all user variables of the HIQ controller.
 
 ### Phase 2: CybroDirect facade + test fake (python-cybro)

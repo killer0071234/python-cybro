@@ -33,6 +33,22 @@ broadcast PINGs to c13049898 without getting an answer.
 | S6  | Timing, ALC, max frame                        | **Max frame:** READ_RANDOM with 300 × 4-byte values (request 627 B, reply 1218 B) works; 400 values (reply 1618 B, above the 1472-byte UDP payload of a 1500 MTU) times out. 3 frames arrived that matched nothing (rx 125 / tx 122), cause unknown. → keep the 1000-byte limit. **Read:** 32 user variables in 1–3 ms (one frame). c10000: RTT 1.7 / 2.4 / 4.3 ms (min/median/max). `alc.zip` 27,563 bytes → 108 READ_CODE exchanges in **0.3 s**. ALC text 312 kB, **14,990 variables** (BIT 2413, INT 12423, LONG 154, no REAL), only 32 user variables. Program 2026-10-10 14:19:50, Cybro-3 | ✅                                        |
 | S7  | Push ACK needed?                              | No push frames seen → not relevant for these controllers                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | ✅ n/a                                    |
 
+## Library checks against hardware (2026-10-25)
+
+`scripts/abus_compare.py` (python-cybro `cybro.abus` / `CybroDirect` code) vs
+the scgi server at 192.168.10.201:
+
+| Check | Result |
+|---|---|
+| T3 status + head (c10000) | kernel active, run, program 2026-10-10 14:19:50, Cybro-3 |
+| T4 ALC variable count = `c<nad>.sys.variables` | c10000: 14,990 = 14,990 · c32215: 1,651 = 1,651 |
+| T5 user variables, direct vs scgi (c10000) | 32 of 32 equal, 1 ms, 0 timeouts |
+| T5 REAL (c32215.fPowerTotal) | equal |
+| T5 write round trip (c10000.lc00_qx00=1) | direct 1, scgi 1, restored |
+
+The scgi server doesn't URL-decode names: array elements must be sent as
+`name[0]`, not `name%5B0%5D` (unknown variable otherwise).
+
 ## HIQ program marker
 
 The HIQ program sets at startup:
