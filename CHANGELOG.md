@@ -10,6 +10,8 @@ merged pull requests.
 
 ## [Unreleased]
 
+## [1.0.0b1] - 2026-10-25
+
 ### Added
 
 - `CybroDirect`: the `Cybro` API without scgi server. It talks to the controller
@@ -21,14 +23,14 @@ merged pull requests.
   memory, ALC, random read/write in frames of max. 1000 bytes), `locate()` and
   `scan()` (READ_STATUS to NAD 0 finds every controller on the LAN). Ported from
   the Cybro Edge Toolkit with the permission of Cybrotech.
-- `cybro.testing.FakeAbusController`: a fake controller on UDP for tests.
+- `cybro.testing.FakeAbusController`: a fake controller on UDP for tests. ([#347])
 
 ### Fixed
 
 - `PlcInfo.parse_alc_file()` crashed with `IndexError` on the empty last line of
   the raw ALC text, cut the last character of names that end the line
   (`main.alarm_algo.alarm_indicator_old`), and listed the ALC header as
-  `c<nad>.Name`.
+  `c<nad>.Name`. ([#347])
 
 - `read_var_int()`, `read_var_float()` and `read_var_bool()` return `int`, `float`
   and `bool` instead of the raw string. With a `var_type`, `write_var()` returns the
@@ -168,7 +170,8 @@ merged pull requests.
 
 - Variables are requested in chunks of 25.
 
-[Unreleased]: https://github.com/killer0071234/python-cybro/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/killer0071234/python-cybro/compare/v1.0.0b1...HEAD
+[1.0.0b1]: https://github.com/killer0071234/python-cybro/compare/v0.4.1...v1.0.0b1
 [0.4.1]: https://github.com/killer0071234/python-cybro/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/killer0071234/python-cybro/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/killer0071234/python-cybro/compare/v0.3.0...v0.3.1
@@ -202,3 +205,4 @@ merged pull requests.
 [#330]: https://github.com/killer0071234/python-cybro/pull/330
 [#334]: https://github.com/killer0071234/python-cybro/pull/334
 [#335]: https://github.com/killer0071234/python-cybro/pull/335
+[#347]: https://github.com/killer0071234/python-cybro/pull/347
