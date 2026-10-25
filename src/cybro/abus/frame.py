@@ -110,6 +110,11 @@ class Frame:
         )
 
     @property
+    def size(self) -> int:
+        """Return the encoded size in bytes."""
+        return _MIN_SIZE + len(self.body)
+
+    @property
     def kind(self) -> str:
         """Classify the frame: push, broadcast, socket, request or response."""
         if self.to_nad == 0 and self.direction == Direction.ACK:

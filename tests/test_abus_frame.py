@@ -72,6 +72,7 @@ def test_encode_request() -> None:
     body = bytes([Command.READ_RANDOM]) + struct.pack("<3HH", 0, 0, 1, 0x3218)
     frame = Frame(1010, 32215, 42, Direction.REQ, 0, body)
     assert encode(frame).hex() == READ_RANDOM_REQUEST
+    assert frame.size == len(bytes.fromhex(READ_RANDOM_REQUEST))
 
 
 def test_crc() -> None:
