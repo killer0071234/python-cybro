@@ -19,3 +19,7 @@ class CybroConnectionTimeoutError(CybroConnectionError):
 
 class CybroPlcNotFoundError(CybroError):
     """Cybro PLC (info) not found."""
+
+
+class AbusError(CybroError):
+    """Invalid A-bus frame or negative answer from a controller."""
