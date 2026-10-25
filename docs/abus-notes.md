@@ -45,6 +45,7 @@ the scgi server at 192.168.10.201:
 | T5 user variables, direct vs scgi (c10000) | 32 of 32 equal, 1 ms, 0 timeouts |
 | T5 REAL (c32215.fPowerTotal) | equal |
 | T5 write round trip (c10000.lc00_qx00=1) | direct 1, scgi 1, restored |
+| T5 all variables, direct vs scgi (c10000, `--all`) | 14,978 of 14,990 equal; direct read 176 ms, 0 timeouts. The 12 others change at run time (`clock_100ms`, `clock_1s`, `rtc_sec` 48 vs 49, `scan_time`, `scan_frequency`, `cybro_msg_per_second`, `cybro_iw12`, `main.*_algo` indexes/steps): the scgi read (300 requests of 50 names) ran seconds later |
 
 The scgi server doesn't URL-decode names: array elements must be sent as
 `name[0]`, not `name%5B0%5D` (unknown variable otherwise).
