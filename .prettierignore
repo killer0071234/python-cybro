@@ -117,3 +117,5 @@ node_modules/
 
 # Deepcode AI
 .dccache
+tasks/
+docs/abus-notes.md
