@@ -228,9 +228,8 @@ direct vs SCGI values identical for all user variables of the HIQ controller.
 - [x] **T7 (S) Reusable fake UDP controller.** `cybro.testing.FakeAbusController`
       (variables + generated ALC zip, optional password, optional push/broadcast
       emission). Used by both repos.
-- [ ] **T8 (S) Release `cybro` 1.0.0b1** (pre-release on PyPI) + changelog.
-  Version, changelog and README are prepared; the GitHub release (publishes
-  to PyPI) is still to do.
+- [x] **T8 (S) Release `cybro` 1.0.0b1** (pre-release on PyPI) + changelog.
+  Released 2026-10-25.
 
 **Checkpoint 2:** beta installable. The `ha-hiq` dev container runs with
 `pip install cybro==1.0.0b1`.

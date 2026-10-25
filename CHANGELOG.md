@@ -10,6 +10,10 @@ merged pull requests.
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-10-25
+
+Stable release of 1.0.0b1, no code changes.
+
 ## [1.0.0b1] - 2026-10-25
 
 ### Added
@@ -170,7 +174,8 @@ merged pull requests.
 
 - Variables are requested in chunks of 25.
 
-[Unreleased]: https://github.com/killer0071234/python-cybro/compare/v1.0.0b1...HEAD
+[Unreleased]: https://github.com/killer0071234/python-cybro/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/killer0071234/python-cybro/compare/v1.0.0b1...v1.0.0
 [1.0.0b1]: https://github.com/killer0071234/python-cybro/compare/v0.4.1...v1.0.0b1
 [0.4.1]: https://github.com/killer0071234/python-cybro/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/killer0071234/python-cybro/compare/v0.3.1...v0.4.0
