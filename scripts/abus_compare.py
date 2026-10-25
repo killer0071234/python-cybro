@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """Compare direct A-bus reads with the scgi server (T4/T5 live check).
 
-Run on the host (not in the devcontainer), with the scgi server running:
+Run on the host (not in the devcontainer), with the scgi server running.
+It uses the library, so install it with its dependencies first:
+
+  python -m pip install -e .        # or: poetry install; poetry run python ...
 
   abus_compare.py --nad 10000 --scgi http://192.168.10.201:4000
   abus_compare.py --nad 10000 --scgi http://... --all          # all variables
