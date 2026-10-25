@@ -184,6 +184,16 @@ class TestCybro(IsolatedAsyncioTestCase):
             },
         )
 
+    def test_plc_info_parse_alc_file_leading_newline(self) -> None:
+        """The scgi server adds a newline before the ALC text: no header entry."""
+        plc_info = PlcInfo.from_vars(var_vars(), 1000)
+        plc_info.alc_file = (
+            "\n;CPU CyBro-2 1000\n"
+            ";Addr Id    Array Offset Size Scope  Type  Name\n"
+            "0050  00000 1     0      1    global bit   lc00_general_error\n"
+        )
+        self.assertEqual(plc_info.parse_alc_file(), {"c1000.lc00_general_error": "bit"})
+
     def test_var_from_dict(self) -> None:
         """Check for Var parsing."""
         var = Var.from_dict(
