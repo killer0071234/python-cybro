@@ -238,11 +238,14 @@ class PlcInfo:  # pylint:
             self.plc_vars = res
             return res
         alc_lines = self.alc_file.splitlines()
-        for line in alc_lines[2:]:
-            typ = line[37:43].rstrip()
-            name = line[43:-1].split()[0].rstrip()
-            res[f"{prefix}{name}"] = typ
-            self.plc_vars = res
+        for line in alc_lines:
+            fields = line[43:].split()
+            # skip comments (";CPU ...", ";Addr ... Name") and empty lines; the
+            # raw text ends with one, the scgi server adds one at both ends
+            if line.startswith(";") or not fields:
+                continue
+            res[f"{prefix}{fields[0]}"] = line[37:43].rstrip()
+        self.plc_vars = res
         return res
 
 

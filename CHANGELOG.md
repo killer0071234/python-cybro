@@ -10,7 +10,25 @@ merged pull requests.
 
 ## [Unreleased]
 
+### Added
+
+- `CybroDirect`: the `Cybro` API without scgi server. It talks to the controller
+  directly over A-bus (UDP 8442) and returns the same `Device`. All controllers
+  share one `cybro.abus.AbusTransport`. Without a static IP, a controller is found
+  by broadcast. The ALC is downloaded again after a program change and kept in
+  memory otherwise. Values are formatted like the scgi server does.
+- `cybro.abus`: frame codec, transport, `AbusClient` (status, program head, code
+  memory, ALC, random read/write in frames of max. 1000 bytes), `locate()` and
+  `scan()` (READ_STATUS to NAD 0 finds every controller on the LAN). Ported from
+  the Cybro Edge Toolkit with the permission of Cybrotech.
+- `cybro.testing.FakeAbusController`: a fake controller on UDP for tests.
+
 ### Fixed
+
+- `PlcInfo.parse_alc_file()` crashed with `IndexError` on the empty last line of
+  the raw ALC text, cut the last character of names that end the line
+  (`main.alarm_algo.alarm_indicator_old`), and listed the ALC header as
+  `c<nad>.Name`.
 
 - `read_var_int()`, `read_var_float()` and `read_var_bool()` return `int`, `float`
   and `bool` instead of the raw string. With a `var_type`, `write_var()` returns the

@@ -1,6 +1,8 @@
 """Asynchronous Python client for Cybro."""
 
 from .cybro import Cybro
+from .direct import CybroDirect
+from .exceptions import AbusError
 from .exceptions import CybroConnectionError
 from .exceptions import CybroConnectionTimeoutError
 from .exceptions import CybroEmptyResponseError
@@ -13,12 +15,14 @@ from .models import VarInfo
 from .models import VarType
 
 __all__ = [
+    "AbusError",
     "Device",
     "ServerInfo",
     "VarType",
     "Var",
     "VarInfo",
     "Cybro",
+    "CybroDirect",
     "CybroConnectionError",
     "CybroConnectionTimeoutError",
     "CybroEmptyResponseError",

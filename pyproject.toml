@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "cybro"
-version = "0.4.1"
-description = "Asynchronous Python client for the Cybro scgi server (v3.2.6 and newer)."
+version = "1.0.0b1"
+description = "Asynchronous Python client for Cybro PLCs: scgi server (v3.2.6 and newer) or direct A-bus/UDP."
 authors = ["Daniel Gangl <killer007@gmx.at>"]
 maintainers = ["Daniel Gangl <killer007@gmx.at>"]
 license = "MIT"
@@ -9,7 +9,7 @@ readme = "README.md"
 homepage = "https://github.com/killer0071234/python-cybro"
 repository = "https://github.com/killer0071234/python-cybro"
 documentation = "https://github.com/killer0071234/python-cybro"
-keywords = ["cybro", "api", "async", "client"]
+keywords = ["cybro", "hiq", "abus", "api", "async", "client"]
 classifiers = [
   "Development Status :: 4 - Beta",
   "Framework :: AsyncIO",
@@ -92,6 +92,7 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["S101"]
+"scripts/abus_probe.py" = ["S104", "S603", "S607"]  # CLI tool: binds 0.0.0.0, calls arp
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
