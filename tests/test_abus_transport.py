@@ -179,17 +179,32 @@ async def test_two_controllers_in_parallel(transport: AbusTransport) -> None:
 
 
 @pytest.mark.asyncio
-async def test_same_key_is_rejected(transport: AbusTransport) -> None:
-    """Two requests with the same NAD pair and txn can't be told apart."""
+async def test_same_key_waits(transport: AbusTransport) -> None:
+    """Requests with the same NAD pair and txn (password) run one after another."""
+    peer = await start_peer(lambda f, _: [ack(f, bytes([len(peer.received)]))])
+    results = await asyncio.gather(
+        transport.exchange(ping(10000, 7), peer.addr),
+        transport.exchange(ping(10000, 7), peer.addr),
+        transport.exchange(ping(10000, 7), peer.addr),
+    )
+    assert sorted(frame.body for frame, _ in results) == [b"\x01", b"\x02", b"\x03"]
+    assert not transport._pending  # noqa: SLF001
+
+
+@pytest.mark.asyncio
+async def test_same_key_waits_for_cancelled(transport: AbusTransport) -> None:
+    """A cancelled exchange frees its key for the next one."""
     peer = await start_peer(lambda f, _: [])
     task = asyncio.create_task(transport.exchange(ping(10000, 7), peer.addr))
     await asyncio.sleep(0)
-    with pytest.raises(RuntimeError, match="pending"):
-        await transport.exchange(ping(10000, 7), peer.addr)
+    second = asyncio.create_task(transport.exchange(ping(10000, 7), peer.addr))
+    await asyncio.sleep(0)
     task.cancel()
+    peer.handler = lambda f, _: [ack(f, b"ok")]
+    frame, _ = await second
+    assert frame.body == b"ok"
     with pytest.raises(asyncio.CancelledError):
         await task
-    assert not transport._pending  # noqa: SLF001
 
 
 @pytest.mark.asyncio

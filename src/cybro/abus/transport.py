@@ -114,11 +114,15 @@ class AbusTransport(asyncio.DatagramProtocol):
         Without addr the request is broadcast. The request is sent again
         after each timeout. Raises CybroConnectionTimeoutError when all
         attempts are used up. Negative answers (DENIED, ...) are returned.
+        Exchanges with the same NAD pair and txn run one after another.
         """
         self._check_open()
         key = _request_key(request)
-        if key in self._pending:
-            raise RuntimeError(f"request {key} is already pending")
+        # same NAD pair and txn (a password is the txn): answers can't be told
+        # apart, so wait until the other exchange is done
+        while key in self._pending:
+            await asyncio.wait([self._pending[key]])
+            self._check_open()
         target = addr or (self.broadcast, self.port)
         raw = encode(request)
         future = asyncio.get_running_loop().create_future()
