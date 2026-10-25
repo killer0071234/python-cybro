@@ -191,43 +191,46 @@ Sizes: S ≈ ≤ 1 file / few hours, M ≈ 2–4 files / ~1 day.
 
 ### Phase 1: Protocol core (python-cybro)
 
-- [ ] **T1 (S) Frame codec + CRC.** `cybro/abus/frame.py`.
+- [x] **T1 (S) Frame codec + CRC.** `cybro/abus/frame.py`.
       _Done when:_ encode(decode(x)) == x for S1 captures. A wrong CRC, signature or
       length raises `AbusError`. CRC vectors pass.
-- [ ] **T2 (M) AbusTransport.** Shared datagram endpoint, futures by
+- [x] **T2 (M) AbusTransport.** Shared datagram endpoint, futures by
       (nad pair, txn), 200 ms × 3 retries, broadcast enabled, unsolicited callback,
       close().
       _Done when:_ tests with a loopback fake peer cover match, timeout and retry,
       ignoring foreign frames, and two controllers in parallel.
-- [ ] **T3 (M) AbusClient basics.** ping, read_status, read_head, read_code
+- [x] **T3 (M) AbusClient basics.** ping, read_status, read_head, read_code
       (segmenting), locate().
       _Done when:_ fake controller tests pass. Probe run against real hardware
       returns the status and program timestamp.
-- [ ] **T4 (M) ALC.** fetch_alc (descriptor table → `alc.zip` → unzip in
+- [x] **T4 (M) ALC.** fetch_alc (descriptor table → `alc.zip` → unzip in
       executor) + typed parser (arrays, user flag, BIT/INT/LONG/REAL). Also fix
       `PlcInfo.parse_alc_file()`: skip blank lines, don't cut the last character
       of the name (`line[43:-1]`), see notes "ALC files".
       _Done when:_ the real controller's ALC parses and the variable count matches
       `sys.variables` of the SCGI server.
-- [ ] **T5 (M) Random read/write.** Group by size, split ≤ 1000 bytes, type
+- [x] **T5 (M) Random read/write.** Group by size, split ≤ 1000 bytes, type
       conversion, password as txn id.
       _Done when:_ reading 300 variables gives the same values as the SCGI server
       (one live comparison script). Writing a test variable round-trips.
 
-**Checkpoint 1:** python-cybro `pytest` + lint green. Live comparison script:
+**Checkpoint 1:** python-cybro `pytest` + lint green (done). Open: hardware
+checks of T3–T5 with `scripts/abus_probe.py info` and `scripts/abus_compare.py`. Live comparison script:
 direct vs SCGI values identical for all user variables of the HIQ controller.
 
 ### Phase 2: CybroDirect facade + test fake (python-cybro)
 
-- [ ] **T6 (M) `CybroDirect`.** Same API as `Cybro`. `Device` with string values
+- [x] **T6 (M) `CybroDirect`.** Same API as `Cybro`. `Device` with string values
   - local `sys.*`. IP relearn after timeout. Reload the ALC when the program
     timestamp changes. ALC store hooks.
     _Done when:_ the existing `Cybro` model tests also pass against `CybroDirect`.
     Changing the program on the controller (or in the fake) triggers a reload.
-- [ ] **T7 (S) Reusable fake UDP controller.** `cybro.testing.FakeAbusController`
+- [x] **T7 (S) Reusable fake UDP controller.** `cybro.testing.FakeAbusController`
       (variables + generated ALC zip, optional password, optional push/broadcast
       emission). Used by both repos.
 - [ ] **T8 (S) Release `cybro` 1.0.0b1** (pre-release on PyPI) + changelog.
+  Version, changelog and README are prepared; the GitHub release (publishes
+  to PyPI) is still to do.
 
 **Checkpoint 2:** beta installable. The `ha-hiq` dev container runs with
 `pip install cybro==1.0.0b1`.
