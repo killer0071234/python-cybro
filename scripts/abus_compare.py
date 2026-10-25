@@ -45,10 +45,15 @@ CHUNK = 50  # variables per scgi request
 
 
 def scgi_get(base: str, names: list[str]) -> dict[str, str | None]:
-    """Return name -> value (None if no value) for the names from the scgi server."""
+    """Return name -> value (None if no value) for the names from the scgi server.
+
+    The server does not decode names, so "[" and "]" are sent as they are.
+    """
     result: dict[str, str | None] = {}
     for start in range(0, len(names), CHUNK):
-        query = "&".join(urllib.parse.quote(n) for n in names[start : start + CHUNK])
+        query = "&".join(
+            urllib.parse.quote(n, safe=".[]") for n in names[start : start + CHUNK]
+        )
         with urllib.request.urlopen(f"{base}/?{query}", timeout=10) as response:  # noqa: S310
             root = ET.fromstring(response.read())  # noqa: S314 - own scgi server
         for var in root.iter("var"):
