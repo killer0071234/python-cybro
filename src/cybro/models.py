@@ -239,10 +239,11 @@ class PlcInfo:  # pylint:
             return res
         alc_lines = self.alc_file.splitlines()
         for line in alc_lines[2:]:
-            typ = line[37:43].rstrip()
-            name = line[43:-1].split()[0].rstrip()
-            res[f"{prefix}{name}"] = typ
-            self.plc_vars = res
+            fields = line[43:].split()
+            if not fields:  # empty line (the raw ALC text ends with one)
+                continue
+            res[f"{prefix}{fields[0]}"] = line[37:43].rstrip()
+        self.plc_vars = res
         return res
 
 

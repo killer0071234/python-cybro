@@ -161,6 +161,29 @@ class TestCybro(IsolatedAsyncioTestCase):
         res = plc_info.parse_alc_file()
         self.assertCountEqual(res, {})
 
+    def test_plc_info_parse_alc_file_raw_text(self) -> None:
+        """Parse the raw ALC text of a controller (CRLF, trailing empty line).
+
+        Names that end the line keep their last character.
+        """
+        plc_info = PlcInfo.from_vars(var_vars(), 1000)
+        plc_info.alc_file = (
+            ";CPU CyBro-2 1000\r\n"
+            ";Addr Id    Array Offset Size Scope  Type  Name\r\n"
+            "3218  00004 1     0      4    global real  fPowerTotal\r\n"
+            "0B12  00000 1     0      1    main   bit   main.alarm_algo.alarm_indicator_old\r\n"
+            "0050  00000 1     0      1    global bit   lc00_general_error               Error.\r\n"
+            "\r\n"
+        )
+        self.assertEqual(
+            plc_info.parse_alc_file(),
+            {
+                "c1000.fPowerTotal": "real",
+                "c1000.main.alarm_algo.alarm_indicator_old": "bit",
+                "c1000.lc00_general_error": "bit",
+            },
+        )
+
     def test_var_from_dict(self) -> None:
         """Check for Var parsing."""
         var = Var.from_dict(
