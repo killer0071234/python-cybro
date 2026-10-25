@@ -41,6 +41,7 @@ class Cybro:
 
     _device: Device | None = None
     _close_session: bool = False
+    _var_chunk_size = VAR_CHUNK_SIZE  # variables per request
 
     def __init__(
         self,
@@ -211,7 +212,7 @@ class Cybro:
                     _vars = _add_hiq_tags(_vars, _controller)
 
             # Update system info in chunks
-            _sys_vars = _get_chunk(_vars, VAR_CHUNK_SIZE)
+            _sys_vars = _get_chunk(_vars, self._var_chunk_size)
             for _vars in _sys_vars:
                 if not (data1 := await self.request(data=_vars)):
                     raise CybroEmptyResponseError(
@@ -229,7 +230,7 @@ class Cybro:
                 self._device.update_from_dict(_data1, plc_nad=self.nad)
 
             if len(self._device.user_vars) > 0:
-                _user_vars = _get_chunk(self._device.user_vars, VAR_CHUNK_SIZE)
+                _user_vars = _get_chunk(self._device.user_vars, self._var_chunk_size)
                 for _vars in _user_vars:
                     if not (data := await self.request(data=_vars)):
                         raise CybroEmptyResponseError(
@@ -241,7 +242,7 @@ class Cybro:
             return self._device
 
         if len(self._device.user_vars) > 0:
-            _user_vars = _get_chunk(self._device.user_vars, VAR_CHUNK_SIZE)
+            _user_vars = _get_chunk(self._device.user_vars, self._var_chunk_size)
             for _vars in _user_vars:
                 if not (data := await self.request(data=_vars)):
                     raise CybroEmptyResponseError(

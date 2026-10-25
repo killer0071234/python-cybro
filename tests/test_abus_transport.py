@@ -101,6 +101,7 @@ async def test_exchange_matches_response(transport: AbusTransport) -> None:
     assert frame == Frame(10000, SOURCE, 7, Direction.ACK, 0, b"\x01\x02")
     assert addr == peer.addr
     assert len(peer.received) == 1
+    assert (transport.tx_count, transport.rx_count) == (1, 1)
 
 
 @pytest.mark.asyncio

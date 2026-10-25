@@ -61,6 +61,8 @@ class AbusTransport(asyncio.DatagramProtocol):
         self._collectors: list[tuple[Key, list[tuple[Frame, Addr]]]] = []
         self._callbacks: list[UnsolicitedCallback] = []
         self._txn = 0
+        self.rx_count = 0
+        self.tx_count = 0
 
     @classmethod
     async def create(
@@ -123,7 +125,7 @@ class AbusTransport(asyncio.DatagramProtocol):
         self._pending[key] = future
         try:
             for _ in range(self.attempts):
-                self._transport.sendto(raw, target)
+                self._send(raw, target)
                 try:
                     return await asyncio.wait_for(asyncio.shield(future), self.timeout)
                 except TimeoutError:
@@ -148,7 +150,7 @@ class AbusTransport(asyncio.DatagramProtocol):
         collector = ((0, request.from_nad, request.txn), answers)
         self._collectors.append(collector)
         try:
-            self._transport.sendto(encode(request), addr or (self.broadcast, self.port))
+            self._send(encode(request), addr or (self.broadcast, self.port))
             await asyncio.sleep(window)
         finally:
             self._collectors.remove(collector)
@@ -164,6 +166,10 @@ class AbusTransport(asyncio.DatagramProtocol):
                 future.set_exception(CybroConnectionError("transport closed"))
         if self._transport is not None:
             self._transport.close()
+
+    def _send(self, raw: bytes, addr: Addr) -> None:
+        self.tx_count += 1
+        self._transport.sendto(raw, addr)
 
     def _check_open(self) -> None:
         if self._closed:
@@ -185,6 +191,7 @@ class AbusTransport(asyncio.DatagramProtocol):
 
     def datagram_received(self, data: bytes, addr: Addr) -> None:
         """Hand a received frame to its request, collector or the callbacks."""
+        self.rx_count += 1
         try:
             frame = decode(data)
         except AbusError as err:
