@@ -1,6 +1,6 @@
 """Fake A-bus controller on UDP for tests (this library and its users).
 
-fake = await FakeAbusController.start(10000, alc_text=...)
+fake = await FakeAbusController.start(10000, [FakeVar("scan_time", "int", 5)])
 transport = await AbusTransport.create(("127.0.0.1", 0), port=fake.port)
 client = AbusClient(transport, 10000, ip="127.0.0.1")
 """
@@ -11,8 +11,11 @@ import asyncio
 import io
 import struct
 import zipfile
+from collections.abc import Iterable
+from dataclasses import dataclass
 from datetime import datetime
 
+from .abus.alc import DataType
 from .abus.client import FILE_INFO_ADDR
 from .abus.client import HEAD_ADDR
 from .abus.client import SEGMENT_SIZE
@@ -28,6 +31,21 @@ Addr = tuple[str, int]
 
 _FILE_TABLE_ADDR = HEAD_ADDR + 0x100
 _FILES_ADDR = HEAD_ADDR + 0x200
+_FIRST_VAR_ADDR = 0x0100
+_DATA_SIZE = 0x10000
+
+
+@dataclass
+class FakeVar:
+    """A variable of the fake's program (data_type: bit, int, long or real)."""
+
+    name: str
+    data_type: str
+    value: float = 0
+    user: bool = False
+    array: int = 1
+    scope: str = "global"
+    description: str = ""
 
 
 def cybro_timestamp(value: datetime) -> int:
@@ -48,13 +66,17 @@ class FakeAbusController(asyncio.DatagramProtocol):
     def __init__(
         self,
         nad: int,
-        alc_text: str = "",
+        variables: Iterable[FakeVar] = (),
         *,
+        alc_text: str | None = None,
         password: int | None = None,
         timestamp: datetime = datetime(2026, 10, 10, 14, 19, 50),  # noqa: B008
         magic: int = 31416,
     ) -> None:
-        """Initialize, use `start()` to open the socket."""
+        """Initialize, use `start()` to open the socket.
+
+        alc_text replaces the ALC generated from the variables.
+        """
         self.nad = nad
         self.password = password
         self.system_status = SystemStatus.KERNEL_ACTIVE
@@ -63,8 +85,11 @@ class FakeAbusController(asyncio.DatagramProtocol):
         self.drop = 0  # number of requests to leave unanswered
         self.requests: list[Frame] = []
         self.code = bytearray()
+        self.data = bytearray(_DATA_SIZE)
+        self.alc_text = ""
+        self.addresses: dict[str, tuple[int, DataType]] = {}
         self._transport: asyncio.DatagramTransport | None = None
-        self.load_program(alc_text, timestamp, magic)
+        self.load_program(variables, timestamp, magic, alc_text)
 
     @classmethod
     async def start(
@@ -92,11 +117,42 @@ class FakeAbusController(asyncio.DatagramProtocol):
         self._transport.close()
 
     def load_program(
-        self, alc_text: str, timestamp: datetime, magic: int = 31416
+        self,
+        variables: Iterable[FakeVar],
+        timestamp: datetime,
+        magic: int = 31416,
+        alc_text: str | None = None,
     ) -> None:
-        """Replace the program: head, file table, cyp.zip and alc.zip."""
+        """Replace the program: variables, head, file table and alc.zip."""
+        lines = [
+            f";CPU CyBro-2 {self.nad}",
+            ";Addr Id    Array Offset Size Scope  Type  Name",
+        ]
+        self.addresses = {}
+        address = _FIRST_VAR_ADDR
+        for var in variables:
+            data_type = DataType[var.data_type.upper()]
+            lines.append(
+                f"{address:04X}  {0x02 if var.user else 0:05X} {var.array:<5} {0:<6} "
+                f"{data_type.size:<4} {var.scope:<6} {var.data_type.lower():<5} "
+                f"{var.name:<32} {var.description}".rstrip()
+            )
+            names = (
+                [var.name]
+                if var.array <= 1
+                else [f"{var.name}[{i}]" for i in range(var.array)]
+            )
+            for name in names:
+                self.addresses[name] = (address, data_type)
+                self[name] = var.value
+                address += data_type.size
+        self.alc_text = alc_text if alc_text is not None else "\r\n".join([*lines, ""])
+
         stamp = cybro_timestamp(timestamp)
-        files = [("cyp.zip", _zip("program.cyp", b"")), ("alc.zip", _zip_alc(alc_text))]
+        files = [
+            ("cyp.zip", _zip("program.cyp", b"")),
+            ("alc.zip", _zip_alc(self.alc_text)),
+        ]
         self.code = bytearray(_FILES_ADDR)
         table = bytearray()
         for name, data in files:
@@ -107,6 +163,18 @@ class FakeAbusController(asyncio.DatagramProtocol):
         self.code[_FILE_TABLE_ADDR : _FILE_TABLE_ADDR + len(table)] = table
         struct.pack_into("<6HL", self.code, HEAD_ADDR, 0, magic, 0, 0, 0, 0, stamp)
         struct.pack_into("<LH", self.code, FILE_INFO_ADDR, _FILE_TABLE_ADDR, len(files))
+
+    def __getitem__(self, name: str) -> int | float:
+        """Return the value of a variable."""
+        address, data_type = self.addresses[name]
+        return struct.unpack_from(data_type.fmt, self.data, address)[0]
+
+    def __setitem__(self, name: str, value: float) -> None:
+        """Set the value of a variable."""
+        address, data_type = self.addresses[name]
+        if data_type != DataType.REAL:
+            value = int(value)
+        struct.pack_into(data_type.fmt, self.data, address, value)
 
     def send_frame(self, frame: Frame, addr: Addr) -> None:
         """Send a frame on its own (push, socket or broadcast)."""

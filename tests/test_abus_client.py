@@ -41,7 +41,7 @@ REAL_HEAD = bytes.fromhex(
 @pytest_asyncio.fixture
 async def fake() -> AsyncIterator[FakeAbusController]:
     """Return a fake controller on loopback."""
-    controller = await FakeAbusController.start(NAD, ";CPU CyBro-2 10000\r\n")
+    controller = await FakeAbusController.start(NAD)
     yield controller
     controller.close()
 

@@ -15,6 +15,7 @@ from enum import IntEnum
 
 from ..exceptions import AbusError
 from ..exceptions import CybroConnectionTimeoutError
+from .alc import unzip_alc
 from .frame import Command
 from .frame import Direction
 from .frame import Frame
@@ -268,3 +269,12 @@ class AbusClient:
             FileDescriptor.from_bytes(raw, i * _FILE_DESCRIPTOR.size)
             for i in range(head.file_count)
         ]
+
+    async def fetch_alc(self, head: PlcHead | None = None) -> str:
+        """Download alc.zip and return the allocation table text."""
+        files = await self.read_files(head)
+        alc = next((f for f in files if f.name == "alc.zip"), None)
+        if alc is None:
+            raise AbusError(f"c{self.nad} has no alc.zip")
+        data = await self.read_code(alc.address, alc.size)
+        return await asyncio.get_running_loop().run_in_executor(None, unzip_alc, data)
