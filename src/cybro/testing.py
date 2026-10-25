@@ -1,8 +1,18 @@
 """Fake A-bus controller on UDP for tests (this library and its users).
 
-fake = await FakeAbusController.start(10000, [FakeVar("scan_time", "int", 5)])
-transport = await AbusTransport.create(("127.0.0.1", 0), port=fake.port)
-client = AbusClient(transport, 10000, ip="127.0.0.1")
+It answers PING, READ_STATUS, READ_CODE (head, file table, alc.zip),
+READ_RANDOM and WRITE_RANDOM like a controller with a loaded program,
+and PING / READ_STATUS to NAD 0 like the controllers of the hardware
+spike. Answers above 1472 bytes are lost, like on a 1500 MTU network.
+
+Example::
+
+    fake = await FakeAbusController.start(10000, [FakeVar("scan_time", "int", 5)])
+    transport = await AbusTransport.create(("127.0.0.1", 0), port=fake.port)
+    cybro = CybroDirect(transport, 10000, ip="127.0.0.1")
+    await cybro.update()  # reads the ALC, needed for add_var()
+    cybro.add_var("c10000.scan_time")
+    device = await cybro.update()
 """
 
 from __future__ import annotations
@@ -21,6 +31,8 @@ from .abus.client import HEAD_ADDR
 from .abus.client import SEGMENT_SIZE
 from .abus.client import PlcStatus
 from .abus.client import SystemStatus
+from .abus.frame import TYPE_BROADCAST
+from .abus.frame import TYPE_COMMAND
 from .abus.frame import Command
 from .abus.frame import Direction
 from .abus.frame import Frame
@@ -180,8 +192,22 @@ class FakeAbusController(asyncio.DatagramProtocol):
         struct.pack_into(data_type.fmt, self.data, address, value)
 
     def send_frame(self, frame: Frame, addr: Addr) -> None:
-        """Send a frame on its own (push, socket or broadcast)."""
+        """Send any frame to addr."""
         self._transport.sendto(encode(frame), addr)
+
+    def send_socket(self, addr: Addr, socket_id: int, body: bytes = b"") -> None:
+        """Send a Cybro socket frame (to NAD 0, ACK, type = socket id)."""
+        self.send_frame(Frame(self.nad, 0, 0, Direction.ACK, socket_id, body), addr)
+
+    def send_push(self, addr: Addr, body: bytes = b"") -> None:
+        """Send a push frame (to NAD 0, ACK, type 0)."""
+        self.send_frame(Frame(self.nad, 0, 0, Direction.ACK, TYPE_COMMAND, body), addr)
+
+    def send_broadcast(self, addr: Addr, body: bytes = b"") -> None:
+        """Send a broadcast frame (to NAD 0, ACK, type 0x64)."""
+        self.send_frame(
+            Frame(self.nad, 0, 0, Direction.ACK, TYPE_BROADCAST, body), addr
+        )
 
     # asyncio.DatagramProtocol
 
