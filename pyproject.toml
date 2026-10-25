@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "cybro"
-version = "1.0.0b1"
+version = "1.0.0"
 description = "Asynchronous Python client for Cybro PLCs: scgi server (v3.2.6 and newer) or direct A-bus/UDP."
 authors = ["Daniel Gangl <killer007@gmx.at>"]
 maintainers = ["Daniel Gangl <killer007@gmx.at>"]
@@ -11,7 +11,7 @@ repository = "https://github.com/killer0071234/python-cybro"
 documentation = "https://github.com/killer0071234/python-cybro"
 keywords = ["cybro", "hiq", "abus", "api", "async", "client"]
 classifiers = [
-  "Development Status :: 4 - Beta",
+  "Development Status :: 5 - Production/Stable",
   "Framework :: AsyncIO",
   "Intended Audience :: Developers",
   "Natural Language :: English",
