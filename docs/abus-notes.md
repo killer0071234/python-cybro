@@ -33,6 +33,107 @@ broadcast PINGs to c13049898 without getting an answer.
 | S6  | Timing, ALC, max frame                        | **Max frame:** READ_RANDOM with 300 × 4-byte values (request 627 B, reply 1218 B) works; 400 values (reply 1618 B, above the 1472-byte UDP payload of a 1500 MTU) times out. 3 frames arrived that matched nothing (rx 125 / tx 122), cause unknown. → keep the 1000-byte limit. **Read:** 32 user variables in 1–3 ms (one frame). c10000: RTT 1.7 / 2.4 / 4.3 ms (min/median/max). `alc.zip` 27,563 bytes → 108 READ_CODE exchanges in **0.3 s**. ALC text 312 kB, **14,990 variables** (BIT 2413, INT 12423, LONG 154, no REAL), only 32 user variables. Program 2026-10-10 14:19:50, Cybro-3 | ✅                                        |
 | S7  | Push ACK needed?                              | No push frames seen → not relevant for these controllers                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | ✅ n/a                                    |
 
+## S9: sockets to a controller (2026-10-26)
+
+Test program on c10000 (now at 192.168.10.219, DHCP moved it from .218),
+program 2026-10-26 09:58:00. Socket **63** sends when `test_sock_bool` changes,
+socket **64** only receives. Both hold the same variables:
+
+```text
+249D  00000 1     0      1    global bit   test_sock_bool
+316E  00000 1     0      2    global int   test_sock_int
+84C0  00000 1     0      4    global long  test_sock_long
+8704  00000 1     0      4    global real  test_sock_real
+```
+
+Run from the devcontainer (Docker NAT, unicast works). `abus_probe.py
+send-socket`, values read back with READ_RANDOM:
+
+| Frame sent to socket 64                                       | Accepted                               |
+| ------------------------------------------------------------- | -------------------------------------- |
+| to_nad 0 / 10000 × unicast / broadcast `192.168.10.255`       | **yes, all four**                      |
+| from_nad 1010, 4242, 0                                        | **yes** (the sender NAD is not checked) |
+| txn 0, 1234                                                   | yes (c10000 has no password)           |
+| direction REQ instead of ACK                                  | **no**                                 |
+| type 65 (no socket with this id)                              | no                                     |
+| type 63 (the sending socket)                                  | **yes**, also writes the variables     |
+| body 3 bytes or 12 bytes (definition is 11)                   | **no**, the frame is ignored          |
+
+- Body layout confirmed: `bool (1) | int (2) | long (4) | real (4)`, 11 bytes,
+  little-endian. Example: `006500e903000000002040` = 0, 101, 1001, 2.5.
+- The controller sends **no answer** to a socket frame.
+- Socket 63 (CyPro "on change" transmit socket) also takes incoming frames:
+  6 frames with new values, all written. The 4 that toggled `test_sock_bool`
+  got no frame back to the sender (bound to :8442, 3 s window), so the
+  on-change transmit doesn't go to the sender (it's broadcast or not triggered).
+  Toggling via WRITE_RANDOM showed nothing in the devcontainer either.
+- Unicast READ_STATUS to NAD 0 (`192.168.10.x`, one per IP) is answered by
+  every controller: a sweep found c8352, c8372, c10000, c32215 (open S2 item).
+- **Receive test on a LAN machine (10:24, 60 s, 153 frames):**
+  `test_sock_bool` toggled via WRITE_RANDOM (10:24:19–24) and via socket 63
+  frames (10:24:32, :40). **No socket 63 frame at all.** c10000 only sent
+  socket 1 (19 bytes, every ~10 s). So the on-change transmit didn't fire,
+  not even for a normal write. To check: transmit settings of socket 63 in
+  CyPro, a toggle from the CyPro online view. Other controllers' sockets
+  (c8372 3/11/23, c32215 4/20/22) arrived. c8372 socket 3 still decodes as
+  3 bits + 3 REAL.
+- **Second receive test (10:32, `listen --nad 10000 --id 63`): socket 63
+  works.** `test_sock_bool` written via WRITE_RANDOM every ~5 s:
+
+  ```text
+  10:32:09 socket 63: 10000 -> 0 txn=0 ACK type=63 body=01f810a8a0060000003242
+  10:32:15 socket 63: 10000 -> 0 txn=0 ACK type=63 body=00f810a8a0060000003242
+  10:32:26 socket 63: 10000 -> 0 txn=0 ACK type=63 body=00f810a8a0060000003242
+  10:32:32 socket 63: 10000 -> 0 txn=0 ACK type=63 body=01f810a8a0060000003242
+  ```
+
+  Body `01 | f810 | a8a00600 | 00003242` = bool 1, int 4344, long 434344,
+  real 44.5: the values the socket 63 frame at 10:24:40 had written. So
+  **received and sent sockets use the same layout** (bits → int → long/real,
+  11 bytes). Sent as a LAN broadcast to :8442, `to_nad` 0, txn 0.
+  The frames match the writes at :09, :15, :26, :32 (same second, the
+  machines' clocks may differ by a few seconds). The write of 1 at :21 has no
+  frame, and neither do the WRITE_RANDOM toggles at 10:24:19–24 (bit 1 → 0
+  within ~2 s). Cause unknown: lost broadcast, or a minimum send interval in
+  the controller. **So on-change sockets can be missed: keep polling as the
+  fallback.** Same program (2026-10-26 09:58:00) during all tests.
+- **Checkpoint 2 (10:55, `examples/sockets.py`, library from `feat/sockets`):**
+
+  ```text
+  10:55:32.101 poll: test_sock_bool=1, test_sock_int=4344, test_sock_long=434344, test_sock_real=44.5
+  10:55:40.646 socket 63 from 192.168.10.219: test_sock_bool=0, test_sock_int=4344, test_sock_long=434344, test_sock_real=44.5
+  10:55:42.128 poll: test_sock_bool=0, test_sock_int=4344, test_sock_long=434344, test_sock_real=44.5
+  ```
+
+  `CybroDirect` decodes the socket with the ALC types, same text as the poll.
+  The change 0 → 1 between the polls at 10:55:21 and :32 sent no frame
+  (another missed on-change socket).
+- **Checkpoint 3 (devcontainer, unicast):** `CybroDirect.send_socket("64;
+  test_sock_bool; test_sock_int; test_sock_long, test_sock_real", values)`:
+
+  ```text
+  before ['0', '4344', '434344', '44.5']
+  after  ['1', '-1234', '-123456789', '-0.125']
+  after  ['0', '32767', '2147483647', '3.5']
+  refused: CybroError socket 64: missing values for test_sock_int, test_sock_long, test_sock_real
+  refused: CybroError test_sock_int: 40000 is out of range for INT
+  ```
+
+- **Send by type** (`CybroDirect.send_socket_values(64, bits=…, ints=…,
+  longs=…, reals=…)`, no names, no ALC):
+
+  ```text
+  before       ['0', '32767', '2147483647', '3.5']
+  by type      ['1', '-7', '-70000', '0.75']
+  as text      ['0', '123', '456', '7.5']
+  short body   ['0', '123', '456', '7.5']   (bits=[1], ints=[999]: ignored)
+  ```
+
+- Earlier attempt from the devcontainer: socket 63 frames don't reach it
+  (they are LAN broadcasts, Docker NAT drops them). The "Terminal & SSH"
+  add-on on 192.168.10.201 isn't on the host network and has no python3.
+  Needs `listen` on a host-network shell or any LAN machine.
+
 ## Library checks against hardware (2026-10-25)
 
 `scripts/abus_compare.py` (python-cybro `cybro.abus` / `CybroDirect` code) vs

@@ -4,6 +4,8 @@ It answers PING, READ_STATUS, READ_CODE (head, file table, alc.zip),
 READ_RANDOM and WRITE_RANDOM like a controller with a loaded program,
 and PING / READ_STATUS to NAD 0 like the controllers of the hardware
 spike. Answers above 1472 bytes are lost, like on a 1500 MTU network.
+Socket frames for `receive_sockets` write their values like the test
+controller of spike S9 (any sender and txn, exact body length, no answer).
 
 Example::
 
@@ -38,6 +40,7 @@ from .abus.frame import Direction
 from .abus.frame import Frame
 from .abus.frame import decode
 from .abus.frame import encode
+from .abus.sockets import SocketDef
 
 Addr = tuple[str, int]
 
@@ -99,6 +102,8 @@ class FakeAbusController(asyncio.DatagramProtocol):
         self.truncate_replies = False  # True: answer READ_RANDOM with 1 byte too few
         self.reply_sizes: list[int] = []
         self.requests: list[Frame] = []
+        self.receive_sockets: dict[int, SocketDef] = {}
+        self.sockets: list[Frame] = []  # socket frames received (also ignored)
         self.code = bytearray()
         self.data = bytearray(_DATA_SIZE)
         self.alc_text = ""
@@ -218,6 +223,14 @@ class FakeAbusController(asyncio.DatagramProtocol):
     def datagram_received(self, data: bytes, addr: Addr) -> None:
         """Answer a request addressed to this controller (or to NAD 0)."""
         frame = decode(data)
+        if (
+            frame.direction == Direction.ACK
+            and frame.msg_type not in (TYPE_COMMAND, TYPE_BROADCAST)
+            and frame.to_nad in (0, self.nad)
+        ):
+            self.sockets.append(frame)
+            self._receive_socket(frame)
+            return
         if frame.direction != Direction.REQ or not frame.body:
             return
         command = frame.body[0]
@@ -239,6 +252,19 @@ class FakeAbusController(asyncio.DatagramProtocol):
         self.reply_sizes.append(answer.size)
         if answer.size <= MAX_UDP_PAYLOAD:  # bigger answers are lost (spike S6)
             self._transport.sendto(encode(answer), addr)
+
+    def _receive_socket(self, frame: Frame) -> None:
+        """Write the values of a receive socket (ignored if it doesn't fit)."""
+        definition = self.receive_sockets.get(frame.msg_type)
+        if definition is None or len(frame.body) != definition.size:
+            return
+        slots = [(self.addresses.get(name), slot) for name, slot in definition.slots()]
+        if any(var is None or var[1].size != slot.size for var, slot in slots):
+            return
+        pos = 0
+        for (address, _), slot in slots:
+            self.data[address : address + slot.size] = frame.body[pos : pos + slot.size]
+            pos += slot.size
 
     def _handle(self, command: int, params: bytes) -> tuple[Direction, bytes]:
         if command == Command.PING:

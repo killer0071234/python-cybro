@@ -248,6 +248,50 @@ async def test_unsolicited_callback(transport: AbusTransport) -> None:
 
 
 @pytest.mark.asyncio
+async def test_on_socket(transport: AbusTransport) -> None:
+    """Only socket frames reach on_socket callbacks, until removed."""
+    peer = await start_peer(lambda f, _: [])
+    seen: list[tuple[Frame, Addr]] = []
+    remove = transport.on_socket(lambda frame, addr: seen.append((frame, addr)))
+    socket = Frame(8372, 0, 0, Direction.ACK, 23, b"\x01")
+    for frame in (
+        socket,
+        Frame(8372, 0, 0, Direction.ACK, 0, b""),  # push
+        Frame(8372, 0, 0, Direction.ACK, 0x64, b""),  # broadcast
+        Frame(8372, SOURCE, 5, Direction.ACK, 0, b""),  # unmatched response
+        Frame(1003, 8372, 6, Direction.REQ, 0, b"\x10"),  # other master
+    ):
+        peer.send(encode(frame), transport.local_addr)
+    await asyncio.sleep(0.01)
+    assert seen == [(socket, peer.addr)]
+    remove()
+    peer.send(encode(socket), transport.local_addr)
+    await asyncio.sleep(0.01)
+    assert len(seen) == 1
+
+
+@pytest.mark.asyncio
+async def test_send_frame(transport: AbusTransport) -> None:
+    """send_frame sends once to addr, or to the broadcast address."""
+    peer = await start_peer(lambda f, _: [])
+    frame = Frame(SOURCE, 0, 0, Direction.ACK, 64, b"\x01")
+    transport.send_frame(frame, peer.addr)
+    await asyncio.sleep(0.01)
+    assert peer.received == [frame]
+    assert transport.tx_count == 1
+
+    broadcast = await AbusTransport.create(
+        (LOCAL, 0), broadcast=LOCAL, port=peer.addr[1]
+    )
+    broadcast.send_frame(frame)
+    await asyncio.sleep(0.01)
+    assert peer.received == [frame, frame]
+    broadcast.close()
+    with pytest.raises(CybroConnectionError, match="closed"):
+        broadcast.send_frame(frame)
+
+
+@pytest.mark.asyncio
 async def test_failing_callback_does_not_break_transport(
     transport: AbusTransport,
 ) -> None:

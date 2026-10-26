@@ -16,6 +16,7 @@ from src.cybro.abus.frame import Command
 from src.cybro.abus.frame import Direction
 from src.cybro.abus.frame import Frame
 from src.cybro.abus.frame import encode
+from src.cybro.abus.sockets import SocketDef
 from src.cybro.abus.transport import AbusTransport
 from src.cybro.exceptions import CybroConnectionTimeoutError
 from src.cybro.testing import FakeAbusController
@@ -115,6 +116,34 @@ async def test_lost_big_answers(fake, transport) -> None:
     with pytest.raises(CybroConnectionTimeoutError):
         await client.call(Command.READ_RANDOM, params)
     assert fake.reply_sizes[-1] == 1618
+
+
+@pytest.mark.asyncio
+async def test_receive_socket(fake, transport) -> None:
+    """Receive sockets write values like the test controller does (S9)."""
+    fake.receive_sockets[64] = SocketDef(64, ints=("scan_time",), longs=("power",))
+    fake.receive_sockets[66] = SocketDef(66, bits=("scan_time",))  # wrong slot
+    body = struct.pack("<hf", -7, 2.5)
+    accepted = [
+        Frame(1010, 0, 0, Direction.ACK, 64, body),
+        Frame(4242, NAD, 9, Direction.ACK, 64, struct.pack("<hf", 8, 0.5)),
+    ]
+    ignored = [
+        Frame(1010, 0, 0, Direction.REQ, 64, struct.pack("<hf", 1, 1)),
+        Frame(1010, 0, 0, Direction.ACK, 65, struct.pack("<hf", 2, 2)),
+        Frame(1010, 0, 0, Direction.ACK, 64, struct.pack("<hf", 3, 3) + b"\x00"),
+        Frame(1010, 0, 0, Direction.ACK, 66, b"\x01"),
+        Frame(1010, 4711, 0, Direction.ACK, 64, struct.pack("<hf", 4, 4)),
+    ]
+    transport.send_frame(accepted[0], fake.addr)
+    await asyncio.sleep(0.01)
+    assert (fake["scan_time"], fake["power"]) == (-7, 2.5)
+    for frame in [*ignored, accepted[1]]:
+        transport.send_frame(frame, fake.addr)
+    await asyncio.sleep(0.01)
+    assert (fake["scan_time"], fake["power"]) == (8, 0.5)
+    # every socket frame for this NAD is recorded, also the ignored ones
+    assert fake.sockets == [accepted[0], *ignored[1:4], accepted[1]]
 
 
 def test_public_api() -> None:

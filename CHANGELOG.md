@@ -10,6 +10,21 @@ merged pull requests.
 
 ## [Unreleased]
 
+### Added
+
+- Cybro sockets in direct mode, checked on a real controller:
+  - `CybroDirect.add_socket()`, `remove_socket()` and `on_socket()`: received
+    socket values update `device.vars` right away and go to callbacks as
+    `SocketMessage`. Definitions use the scgi server syntax `id; bits; ints; longs`.
+  - `CybroDirect.send_socket(definition, values)` sends values to a receive socket
+    of the PLC program; `send_socket_values(socket_id, bits, ints, longs, reals)`
+    does the same when only the types are known.
+  - `cybro.abus`: `SocketDef`, `SocketMessage`, `decode_socket()`,
+    `encode_socket()`, `encode_socket_values()`; `AbusTransport.on_socket()` and
+    `send_frame()`; `AbusClient.send_socket()`.
+  - `FakeAbusController.receive_sockets` and `sockets` for tests.
+  - [examples/sockets.py](examples/sockets.py): live socket values.
+
 ## [1.0.0] - 2026-10-25
 
 Stable release of 1.0.0b1, no code changes.

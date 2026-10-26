@@ -196,7 +196,57 @@ asyncio.run(main())
 - `scan()` sends READ_STATUS to NAD 0; every controller answers with its NAD, IP and
   status. `locate(transport, nad)` returns the IP of one controller.
 - Tests: `cybro.testing.FakeAbusController` is a fake controller on UDP with
-  variables, an ALC, an optional password and socket/push frames.
+  variables, an ALC, an optional password and socket/push frames. Its
+  `receive_sockets` take sockets like a PLC program; `sockets` lists the socket
+  frames it got.
+
+### Sockets
+
+Cybro sockets are variable lists a PLC program sends (e.g. on change) and
+receives. The frame doesn't say which variables it holds, so you pass the
+definition from the CyPro program, in the scgi server's syntax
+`id; bits; ints; longs` (4-byte slots hold LONG and REAL variables):
+
+```python
+SOCKET = "63; test_sock_bool; test_sock_int; test_sock_long, test_sock_real"
+
+cybro = CybroDirect(transport, nad=10000)
+await cybro.update()  # loads the ALC: sockets before it are dropped
+cybro.add_socket(SOCKET)
+cybro.on_socket(lambda message: print(message.socket_id, message.values))
+# message.values: {"test_sock_bool": 1, "test_sock_int": 4344, ...}
+
+# send to a receive socket of the PLC program
+await cybro.send_socket(
+    "64; test_sock_bool; test_sock_int; test_sock_long, test_sock_real",
+    {
+        "test_sock_bool": 1,
+        "test_sock_int": -7,
+        "test_sock_long": 70000,
+        "test_sock_real": 0.75,
+    },
+)
+# or by type, when the names are unknown (order: bits, ints, longs, reals)
+await cybro.send_socket_values(64, bits=[1], ints=[-7], longs=[70000], reals=[0.75])
+```
+
+- Received values update `device.vars` right away, formatted like a read, and go to
+  the `on_socket()` callbacks as `SocketMessage` (NAD, socket id, values, address).
+  Callbacks run in the receive handler and must not block.
+- Sockets are only received while the transport is bound to UDP 8442. They are LAN
+  broadcasts, so they don't reach a container without host networking.
+- **Sockets can be missed** (the test controller skipped some on-change frames), so
+  keep calling `update()`.
+- Frames from other NADs, with an unknown id, a body that doesn't match the
+  definition, or before the first `update()` are dropped.
+- Sending checks every value like `write_var()` and needs every variable of the
+  definition. It is sent once to the controller's IP (never broadcast); the PLC
+  doesn't answer, so a lost frame isn't noticed. The PLC ignores a body whose
+  length doesn't match its socket, but can't tell a LONG from a REAL slot.
+- `remove_socket(id)` stops one socket, `disconnect()` all of them.
+- `cybro.abus.SocketDef`, `decode_socket()`, `encode_socket()` and
+  `encode_socket_values()` work on the frame bodies without a controller.
+  [examples/sockets.py](examples/sockets.py) shows live socket values.
 
 The A-bus protocol code is ported from the Cybro Edge Toolkit (scgi_server) with
 the permission of Cybrotech.

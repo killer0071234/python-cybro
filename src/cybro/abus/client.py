@@ -242,6 +242,20 @@ class AbusClient:
         """Ping the controller (finds its IP if unknown)."""
         await self.call(Command.PING)
 
+    async def send_socket(self, socket_id: int, body: bytes) -> None:
+        """Send a socket frame once to the controller's IP.
+
+        The controller doesn't answer (spike S9), so a lost frame isn't
+        noticed. It's never broadcast: every controller with this socket id
+        would take it. Without a known IP the controller is pinged first.
+        """
+        if self.ip is None:
+            await self.ping()
+        txn = self.password if self.password is not None else 0
+        frame = Frame(self.source_nad, 0, txn, Direction.ACK, socket_id, body)
+        self.transport.send_frame(frame, (self.ip, self.port))
+        self.bytes_transferred += frame.size
+
     async def read_status(self) -> Status:
         """Return the system and PLC status."""
         return Status.from_bytes(await self.call(Command.READ_STATUS))
