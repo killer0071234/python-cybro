@@ -1,6 +1,6 @@
 # Plan: Cybro sockets (receive + send) in direct mode
 
-Status: draft for review · Repo: `python-cybro`
+Status: done, released in 1.1.0 · Repo: `python-cybro`
 Sources: `docs/abus-notes.md` (spike S3), Edge Toolkit scgi_server
 (`socket_service/socket_message.py`, `config/eth_config.py`, `config.ini`).
 
