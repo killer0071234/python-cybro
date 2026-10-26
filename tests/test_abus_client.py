@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncIterator
 from datetime import datetime
 
@@ -18,6 +19,7 @@ from src.cybro.abus.client import SystemStatus
 from src.cybro.abus.client import cybro_datetime
 from src.cybro.abus.frame import Command
 from src.cybro.abus.frame import Direction
+from src.cybro.abus.frame import Frame
 from src.cybro.abus.locate import ScanResult
 from src.cybro.abus.locate import locate
 from src.cybro.abus.locate import scan
@@ -209,6 +211,42 @@ async def test_timeout_without_ip(fake, transport) -> None:
         await client.ping()
     assert len(fake.requests) == 3
     assert client.com_error_count == 1
+
+
+@pytest.mark.asyncio
+async def test_send_socket(fake, transport) -> None:
+    """A socket is sent once to the controller, located first if needed."""
+    client = AbusClient(transport, NAD)
+    await client.send_socket(64, b"\x01")
+    await asyncio.sleep(0.01)
+    assert [frame.body[0] for frame in fake.requests] == [Command.PING]
+    assert fake.sockets == [Frame(1010, 0, 0, Direction.ACK, 64, b"\x01")]
+    assert client.bytes_transferred == 37 + 19
+
+    await client.send_socket(64, b"\x00")
+    await asyncio.sleep(0.01)
+    assert len(fake.requests) == 1  # IP known: no second PING
+    assert len(fake.sockets) == 2
+
+
+@pytest.mark.asyncio
+async def test_send_socket_with_password(fake, transport) -> None:
+    """With a password, the socket carries it as txn (like requests)."""
+    fake.password = 1234
+    client = AbusClient(transport, NAD, ip=LOCAL, password=1234)
+    await client.send_socket(64, b"\x01")
+    await asyncio.sleep(0.01)
+    assert fake.requests == []  # static IP: sent without a PING
+    assert fake.sockets[0].txn == 1234
+
+
+@pytest.mark.asyncio
+async def test_send_socket_not_found(fake, transport) -> None:
+    """A controller that can't be located raises a timeout."""
+    fake.silent = True
+    with pytest.raises(CybroConnectionTimeoutError):
+        await AbusClient(transport, NAD).send_socket(64, b"\x01")
+    assert fake.sockets == []
 
 
 @pytest.mark.asyncio

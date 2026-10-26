@@ -576,3 +576,63 @@ async def test_socket_updates_learned_ip(
     await deliver()
     assert learned.client.ip == LOCAL
     assert static.client.ip == "127.0.0.2"
+
+
+@pytest.mark.asyncio
+async def test_send_socket(cybro: CybroDirect, fake: FakeAbusController) -> None:
+    """Values are checked, encoded with the ALC types and written by the PLC."""
+    fake.receive_sockets[64] = SocketDef.parse(SOCKET.replace("7;", "64;"))
+    await cybro.send_socket(SOCKET.replace("7;", "64;"), SOCKET_VALUES)
+    await deliver()
+    assert {name: fake[name] for name in SOCKET_VALUES} == SOCKET_VALUES
+    assert fake.sockets[-1].body == socket_body()
+
+    texts = {"cybro_qx00": "0", "scan_time": "5", "energy": "-1", "fPowerTotal": "2.25"}
+    await cybro.send_socket(fake.receive_sockets[64], texts)
+    await deliver()
+    assert [fake[name] for name in texts] == [0, 5, -1, 2.25]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("values", "match"),
+    [
+        ({**SOCKET_VALUES, "scan_time": 40000}, "out of range"),
+        ({**SOCKET_VALUES, "fPowerTotal": "x"}, "invalid value"),
+        ({k: v for k, v in SOCKET_VALUES.items() if k != "energy"}, "missing"),
+        ({**SOCKET_VALUES, "other": 1}, "not in socket 7"),
+    ],
+)
+async def test_send_socket_invalid_values(
+    cybro: CybroDirect, fake: FakeAbusController, values: dict, match: str
+) -> None:
+    """Invalid values raise CybroError and nothing is sent."""
+    with pytest.raises(CybroError, match=match):
+        await cybro.send_socket(SOCKET, values)
+    await deliver()
+    assert fake.sockets == []
+
+
+@pytest.mark.asyncio
+async def test_send_socket_unknown_variable(
+    cybro: CybroDirect, fake: FakeAbusController
+) -> None:
+    """Every variable must be in the PLC's ALC."""
+    with pytest.raises(CybroError, match="unknown variable missing_var"):
+        await cybro.send_socket("7; missing_var", {"missing_var": 1})
+    with pytest.raises(CybroError, match="not allowed in a BIT slot"):
+        await cybro.send_socket("7; scan_time", {"scan_time": 1})
+    await deliver()
+    assert fake.sockets == []
+
+
+@pytest.mark.asyncio
+async def test_send_socket_plc_not_ok(
+    cybro: CybroDirect, fake: FakeAbusController
+) -> None:
+    """A stopped PLC (no ALC) raises CybroError, a bad definition ValueError."""
+    fake.plc_status = PlcStatus.STOP
+    with pytest.raises(CybroError, match="plc status pgm missing"):
+        await cybro.send_socket(SOCKET, SOCKET_VALUES)
+    with pytest.raises(ValueError, match="id must be"):
+        await cybro.send_socket("0; cybro_qx00", {"cybro_qx00": 1})

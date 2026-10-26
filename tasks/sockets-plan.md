@@ -184,15 +184,16 @@ machine). The socket values match the next poll. See `docs/abus-notes.md`.
 
 ### Phase 3: Send (fields from S9)
 
-- [ ] **T5 (S) `AbusClient.send_socket` + fake receive sockets.**
+- [x] **T5 (S) `AbusClient.send_socket` + fake receive sockets.**
       _Done when:_ a frame sent to `FakeAbusController` with `receive_sockets`
       changes its memory. Frame fields match S9.
-- [ ] **T6 (S) `CybroDirect.send_socket`.** Validation as in `write_var`.
+- [x] **T6 (S) `CybroDirect.send_socket`.** Validation as in `write_var`.
       _Done when:_ tests cover OK, unknown variable, value out of range, missing
       slot value, and plc status not ok. The value round-trips through the fake.
 
-**Checkpoint 3:** with the S9 test program, `send_socket` changes the
-controller's variables (read back with `read_var`).
+**Checkpoint 3 (passed 2026-10-26):** `CybroDirect.send_socket` to socket 64
+of c10000 changes all four variables (read back with `read_var`), also
+negative values and the INT/LONG maximum. See `docs/abus-notes.md`.
 
 ### Phase 4: Docs + release
 

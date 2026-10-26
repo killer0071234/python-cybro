@@ -108,6 +108,17 @@ send-socket`, values read back with READ_RANDOM:
   `CybroDirect` decodes the socket with the ALC types, same text as the poll.
   The change 0 → 1 between the polls at 10:55:21 and :32 sent no frame
   (another missed on-change socket).
+- **Checkpoint 3 (devcontainer, unicast):** `CybroDirect.send_socket("64;
+  test_sock_bool; test_sock_int; test_sock_long, test_sock_real", values)`:
+
+  ```text
+  before ['0', '4344', '434344', '44.5']
+  after  ['1', '-1234', '-123456789', '-0.125']
+  after  ['0', '32767', '2147483647', '3.5']
+  refused: CybroError socket 64: missing values for test_sock_int, test_sock_long, test_sock_real
+  refused: CybroError test_sock_int: 40000 is out of range for INT
+  ```
+
 - Earlier attempt from the devcontainer: socket 63 frames don't reach it
   (they are LAN broadcasts, Docker NAT drops them). The "Terminal & SSH"
   add-on on 192.168.10.201 isn't on the host network and has no python3.

@@ -12,6 +12,7 @@ work unchanged. Behaviour follows the Edge Toolkit's scgi_server:
 Socket frames of definitions added with add_socket() update device.vars as
 they arrive and go to the on_socket() callbacks (only while the transport is
 bound to port 8442). They can be missed, so keep calling update().
+send_socket() sends values to a receive socket of the PLC program.
 
 Unlike the scgi server, a controller that doesn't answer raises
 CybroConnectionTimeoutError (there is no server that could answer instead).
@@ -23,6 +24,7 @@ import asyncio
 import logging
 import time
 from collections.abc import Callable
+from collections.abc import Mapping
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version
 from typing import Any
@@ -38,6 +40,7 @@ from .abus.frame import Frame
 from .abus.sockets import SocketDef
 from .abus.sockets import SocketMessage
 from .abus.sockets import decode_socket
+from .abus.sockets import encode_socket
 from .abus.transport import AbusTransport
 from .abus.transport import Addr
 from .cybro import Cybro
@@ -132,6 +135,40 @@ class CybroDirect(Cybro):
         """
         self._socket_callbacks.append(callback)
         return lambda: self._socket_callbacks.remove(callback)
+
+    async def send_socket(
+        self,
+        definition: SocketDef | str,
+        values: Mapping[str, str | int | float],
+    ) -> None:
+        """Send values (by name, without c<nad>.) to a socket of the PLC.
+
+        Every variable of the definition needs a value and must be in the
+        PLC's ALC. Values are checked like write_var(). The PLC doesn't
+        answer, so a lost frame isn't noticed.
+
+        Raises:
+            ValueError: The definition text is invalid.
+            CybroError: A value or variable is invalid, or the PLC has no program.
+            CybroConnectionTimeoutError: The controller doesn't answer.
+        """
+        if isinstance(definition, str):
+            definition = SocketDef.parse(definition)
+        async with self._lock:
+            await self._check_program()
+            if self._plc_status != STATUS_OK:
+                raise CybroError(
+                    f"can't send socket {definition.socket_id}: "
+                    f"plc status {self._plc_status}"
+                )
+            unknown = [name for name, _ in definition.slots() if name not in self._alc]
+            if unknown:
+                raise CybroError(f"unknown variable {', '.join(unknown)}")
+            try:
+                body = encode_socket(definition, values, self._alc)
+            except (ValueError, AbusError) as err:
+                raise CybroError(str(err)) from err
+            await self.client.send_socket(definition.socket_id, body)
 
     async def disconnect(self) -> None:
         """Stop the socket handling (definitions are removed)."""
