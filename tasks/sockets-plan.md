@@ -166,10 +166,10 @@ definition + values.
 
 ### Phase 2: Receive
 
-- [ ] **T3 (S) `AbusTransport.on_socket` + `send_frame`.**
+- [x] **T3 (S) `AbusTransport.on_socket` + `send_frame`.**
       _Done when:_ socket frames reach `on_socket` callbacks, and push,
       broadcast and response frames don't.
-- [ ] **T4 (M) `CybroDirect` socket receive.** `add_socket`, `remove_socket`,
+- [x] **T4 (M) `CybroDirect` socket receive.** `add_socket`, `remove_socket`,
       `on_socket`, `device.vars` update, IP update, unsubscribe on `disconnect()`.
       _Done when:_ with `FakeAbusController.send_socket`: values appear in
       `device.vars` formatted like `read_var()` (REAL as `str(float)`) and

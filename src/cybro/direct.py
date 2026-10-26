@@ -9,6 +9,10 @@ work unchanged. Behaviour follows the Edge Toolkit's scgi_server:
 - Values are formatted with str(), unknown variables are "?".
 - c<nad>.sys.plc_status: "ok", "pgm missing", "alc missing" or "offline".
 
+Socket frames of definitions added with add_socket() update device.vars as
+they arrive and go to the on_socket() callbacks (only while the transport is
+bound to port 8442). They can be missed, so keep calling update().
+
 Unlike the scgi server, a controller that doesn't answer raises
 CybroConnectionTimeoutError (there is no server that could answer instead).
 """
@@ -16,7 +20,9 @@ CybroConnectionTimeoutError (there is no server that could answer instead).
 from __future__ import annotations
 
 import asyncio
+import logging
 import time
+from collections.abc import Callable
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version
 from typing import Any
@@ -28,16 +34,26 @@ from .abus.alc import parse_value
 from .abus.client import SOURCE_NAD
 from .abus.client import AbusClient
 from .abus.client import AbusResponseError
+from .abus.frame import Frame
+from .abus.sockets import SocketDef
+from .abus.sockets import SocketMessage
+from .abus.sockets import decode_socket
 from .abus.transport import AbusTransport
+from .abus.transport import Addr
 from .cybro import Cybro
 from .exceptions import AbusError
 from .exceptions import CybroConnectionTimeoutError
 from .exceptions import CybroError
+from .models import Var
 
 try:
     __version__ = version("cybro")
 except PackageNotFoundError:  # pragma: no cover - running from a source tree
     __version__ = "unknown"
+
+_LOGGER = logging.getLogger(__name__)
+
+SocketCallback = Callable[[SocketMessage], None]
 
 STATUS_OK = "ok"
 STATUS_NO_PROGRAM = "pgm missing"
@@ -84,6 +100,46 @@ class CybroDirect(Cybro):
         self._program_timestamp = "?"
         self._alc: dict[str, AlcVar] | None = None
         self._alc_text: str | None = None
+        self._sockets: dict[int, SocketDef] = {}
+        self._socket_callbacks: list[SocketCallback] = []
+        self._remove_socket_handler: Callable[[], None] | None = None
+
+    def add_socket(self, definition: SocketDef | str) -> SocketDef:
+        """Handle socket frames of this definition from now on.
+
+        definition is a SocketDef or its text ("id; bits; ints; longs").
+        Frames before the first update() (no ALC yet) are dropped.
+        Raises ValueError if the text is invalid.
+        """
+        if isinstance(definition, str):
+            definition = SocketDef.parse(definition)
+        self._sockets[definition.socket_id] = definition
+        if self._remove_socket_handler is None:
+            self._remove_socket_handler = self.transport.on_socket(
+                self._socket_received
+            )
+        return definition
+
+    def remove_socket(self, socket_id: int) -> None:
+        """Stop handling a socket id."""
+        self._sockets.pop(socket_id, None)
+
+    def on_socket(self, callback: SocketCallback) -> Callable[[], None]:
+        """Call callback(message) for each decoded socket frame.
+
+        It runs inside the transport's receive handler, so it must not block.
+        Returns a function that removes the callback again.
+        """
+        self._socket_callbacks.append(callback)
+        return lambda: self._socket_callbacks.remove(callback)
+
+    async def disconnect(self) -> None:
+        """Stop the socket handling (definitions are removed)."""
+        if self._remove_socket_handler is not None:
+            self._remove_socket_handler()
+            self._remove_socket_handler = None
+        self._sockets.clear()
+        await super().disconnect()
 
     async def request(self, data: dict | str | None = None) -> Any:
         """Read and write variables, answer like the scgi server.
@@ -143,6 +199,39 @@ class CybroDirect(Cybro):
                 return
             self._alc, self._alc_text, self._timestamp = alc, text, head.timestamp
         self._plc_status = STATUS_OK if self._alc is not None else STATUS_NO_ALC
+
+    def _socket_received(self, frame: Frame, addr: Addr) -> None:
+        """Decode a socket frame, update device.vars, call the callbacks."""
+        definition = self._sockets.get(frame.msg_type)
+        if frame.from_nad != self.nad or definition is None:
+            return
+        if self._alc is None:
+            _LOGGER.debug(
+                "Socket %s from c%s dropped: no allocation table yet",
+                frame.msg_type,
+                self.nad,
+            )
+            return
+        try:
+            values = decode_socket(definition, frame.body, self._alc)
+        except AbusError as err:
+            _LOGGER.debug("Socket from c%s dropped: %s", self.nad, err)
+            return
+        if not self.client.static_ip:
+            self.client.ip = addr[0]
+        if self._device is not None:
+            for name, value in values.items():
+                var = self._alc.get(name)
+                full_name = self._prefix + name
+                self._device.vars[full_name] = Var(
+                    full_name, str(value), var.description or None if var else None
+                )
+        message = SocketMessage(self.nad, definition.socket_id, values, addr)
+        for callback in list(self._socket_callbacks):
+            try:
+                callback(message)
+            except Exception:
+                _LOGGER.exception("Error in socket callback")
 
     def _set_program(self, status: str, timestamp: int | None) -> None:
         self._plc_status = status

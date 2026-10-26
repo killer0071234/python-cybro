@@ -106,6 +106,27 @@ class AbusTransport(asyncio.DatagramProtocol):
         self._callbacks.append(callback)
         return lambda: self._callbacks.remove(callback)
 
+    def on_socket(self, callback: UnsolicitedCallback) -> Callable[[], None]:
+        """Call callback(frame, addr) for Cybro socket frames.
+
+        Only received while bound to port 8442. Returns a function that
+        removes the callback again.
+        """
+
+        def handle(frame: Frame, addr: Addr) -> None:
+            if frame.kind == "socket":
+                callback(frame, addr)
+
+        return self.on_unsolicited(handle)
+
+    def send_frame(self, frame: Frame, addr: Addr | None = None) -> None:
+        """Send a frame once, without waiting for an answer.
+
+        Without addr the frame is broadcast.
+        """
+        self._check_open()
+        self._send(encode(frame), addr or (self.broadcast, self.port))
+
     async def exchange(
         self, request: Frame, addr: Addr | None = None
     ) -> tuple[Frame, Addr]:

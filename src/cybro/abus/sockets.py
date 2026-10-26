@@ -87,6 +87,16 @@ class SocketDef:
                 yield name, slot
 
 
+@dataclass(frozen=True)
+class SocketMessage:
+    """Decoded socket frame of a controller."""
+
+    nad: int
+    socket_id: int
+    values: dict[str, int | float]  # names without the c<nad>. prefix
+    addr: tuple[str, int]  # where the frame came from
+
+
 def decode_socket(
     definition: SocketDef, body: bytes, alc: Mapping[str, AlcVar] | None
 ) -> dict[str, int | float]:

@@ -7,6 +7,8 @@ the same contract.
 
 from __future__ import annotations
 
+import asyncio
+import logging
 import re
 from collections.abc import AsyncIterator
 from datetime import datetime
@@ -15,10 +17,15 @@ import pytest
 import pytest_asyncio
 
 from src.cybro import CybroDirect
+from src.cybro.abus.alc import parse_alc
 from src.cybro.abus.client import AbusResponseError
 from src.cybro.abus.client import PlcStatus
 from src.cybro.abus.frame import Command
 from src.cybro.abus.frame import Direction
+from src.cybro.abus.frame import Frame
+from src.cybro.abus.sockets import SocketDef
+from src.cybro.abus.sockets import SocketMessage
+from src.cybro.abus.sockets import encode_socket
 from src.cybro.abus.transport import AbusTransport
 from src.cybro.exceptions import CybroConnectionTimeoutError
 from src.cybro.exceptions import CybroError
@@ -413,3 +420,159 @@ async def test_refused_alc_download(
     monkeypatch.setattr(cybro.client, "fetch_alc", refuse)
     with pytest.raises(AbusResponseError, match="NO_AUTH"):
         await cybro.update()
+
+
+# --- sockets ---
+
+SOCKET = "7; cybro_qx00; scan_time; energy, fPowerTotal"
+SOCKET_VALUES = {"cybro_qx00": 1, "scan_time": -42, "energy": 70000, "fPowerTotal": 1.5}
+
+
+def socket_body(values: dict = SOCKET_VALUES) -> bytes:
+    """Return the body of socket 7 (fPowerTotal is a REAL in the fake)."""
+    alc = parse_alc("0000  00000 1     0      4    global real  fPowerTotal")
+    return encode_socket(SocketDef.parse(SOCKET), values, alc)
+
+
+async def deliver() -> None:
+    """Let the transport receive frames sent on loopback."""
+    await asyncio.sleep(0.02)
+
+
+@pytest.mark.asyncio
+async def test_socket_updates_vars(
+    cybro: CybroDirect, fake: FakeAbusController, transport: AbusTransport
+) -> None:
+    """A socket updates device.vars like a read and reaches the listeners."""
+    device = await cybro.update()
+    messages: list[SocketMessage] = []
+    cybro.on_socket(messages.append)
+    assert cybro.add_socket(SOCKET) == SocketDef.parse(SOCKET)
+
+    fake.send_socket(transport.local_addr, 7, socket_body())
+    await deliver()
+
+    assert messages == [SocketMessage(NAD, 7, SOCKET_VALUES, (LOCAL, fake.port))]
+    values = {name: device.vars[PREFIX + name].value for name in SOCKET_VALUES}
+    assert values == {
+        "cybro_qx00": "1",
+        "scan_time": "-42",
+        "energy": "70000",
+        "fPowerTotal": "1.5",
+    }
+    assert device.vars[f"{PREFIX}scan_time"].description == "Last scan time [ms]."
+    assert device.vars[f"{PREFIX}energy"].description is None
+    # formatted exactly like a read of the same values
+    for name, value in SOCKET_VALUES.items():
+        fake[name] = value
+    for name in SOCKET_VALUES:
+        assert await cybro.read_var(PREFIX + name) == values[name]
+
+
+@pytest.mark.asyncio
+async def test_socket_dropped(
+    cybro: CybroDirect,
+    fake: FakeAbusController,
+    transport: AbusTransport,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Frames that can't be decoded are dropped without an exception."""
+    messages: list[SocketMessage] = []
+    cybro.on_socket(messages.append)
+    cybro.add_socket(SOCKET)
+    with caplog.at_level(logging.DEBUG, logger="src.cybro.direct"):
+        fake.send_socket(transport.local_addr, 7, socket_body())  # no ALC yet
+        await deliver()
+        assert "no allocation table" in caplog.text
+        await cybro.update()
+        fake.send_socket(transport.local_addr, 7, socket_body()[:-1])
+        await deliver()
+        assert "body has 10 bytes" in caplog.text
+    fake.send_socket(transport.local_addr, 8, socket_body())  # unknown id
+    other = Frame(4711, 0, 0, Direction.ACK, 7, socket_body())  # other NAD
+    fake.send_frame(other, transport.local_addr)
+    await deliver()
+    assert messages == []
+    assert f"{PREFIX}scan_time" not in cybro._device.vars  # noqa: SLF001
+
+
+@pytest.mark.asyncio
+async def test_socket_failing_listener(
+    cybro: CybroDirect,
+    fake: FakeAbusController,
+    transport: AbusTransport,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A failing listener is logged, the others still run."""
+    await cybro.update()
+    messages: list[SocketMessage] = []
+
+    def broken(message: SocketMessage) -> None:
+        raise ValueError("boom")
+
+    cybro.on_socket(broken)
+    remove = cybro.on_socket(messages.append)
+    cybro.add_socket(SOCKET)
+    fake.send_socket(transport.local_addr, 7, socket_body())
+    await deliver()
+    assert len(messages) == 1
+    assert "Error in socket callback" in caplog.text
+    remove()
+    fake.send_socket(transport.local_addr, 7, socket_body())
+    await deliver()
+    assert len(messages) == 1
+
+
+@pytest.mark.asyncio
+async def test_remove_socket_and_disconnect(
+    cybro: CybroDirect, fake: FakeAbusController, transport: AbusTransport
+) -> None:
+    """remove_socket() and disconnect() stop the socket handling."""
+    await cybro.update()
+    messages: list[SocketMessage] = []
+    cybro.on_socket(messages.append)
+    cybro.add_socket(SOCKET)
+    cybro.add_socket(SocketDef(9, bits=("cybro_qx00",)))
+    assert len(transport._callbacks) == 1  # noqa: SLF001  subscribed once
+    cybro.remove_socket(7)
+    cybro.remove_socket(7)  # unknown id is fine
+    fake.send_socket(transport.local_addr, 7, socket_body())
+    fake.send_socket(transport.local_addr, 9, b"\x01")
+    await deliver()
+    assert [message.socket_id for message in messages] == [9]
+
+    await cybro.disconnect()
+    assert transport._callbacks == []  # noqa: SLF001
+    fake.send_socket(transport.local_addr, 9, b"\x01")
+    await deliver()
+    assert len(messages) == 1
+
+    cybro.add_socket(SOCKET)  # works again after disconnect
+    fake.send_socket(transport.local_addr, 7, socket_body())
+    await deliver()
+    assert len(messages) == 2
+
+
+@pytest.mark.asyncio
+async def test_add_socket_invalid(cybro: CybroDirect) -> None:
+    """An invalid definition raises ValueError."""
+    with pytest.raises(ValueError, match="id must be"):
+        cybro.add_socket("100; cybro_qx00")
+
+
+@pytest.mark.asyncio
+async def test_socket_updates_learned_ip(
+    transport: AbusTransport, fake: FakeAbusController
+) -> None:
+    """A socket from a new address updates a learned IP, not a static one."""
+    learned = CybroDirect(transport, NAD)
+    static = CybroDirect(transport, NAD, ip="127.0.0.2")
+    await learned.update()
+    learned.client.ip = "127.0.0.3"  # e.g. the controller got a new address
+    for cybro in (learned, static):
+        cybro._alc = learned._alc  # noqa: SLF001
+        cybro.add_socket(SOCKET)
+    fake.send_socket(transport.local_addr, 7, socket_body())
+    await deliver()
+    assert learned.client.ip == LOCAL
+    assert static.client.ip == "127.0.0.2"
