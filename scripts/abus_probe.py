@@ -18,6 +18,9 @@ Examples:
   abus_probe.py read --nad 10000 --user       # read all user variables
   abus_probe.py read --nad 10000 lc00_qx00 th00_temperature
   abus_probe.py maxframe --nad 10000          # S6: largest accepted frame
+  abus_probe.py send-socket --nad 10000 --id 64 --matrix \
+      test_sock_bit=1 test_sock_int=100 test_sock_long=1000 test_sock_real=1.5
+                                              # S9: does the PLC take a socket?
 
 Add "--capture frames.jsonl" to any command to log every raw frame (hex).
 Add "--password N" if the controller has an A-bus password.
@@ -550,6 +553,11 @@ async def cmd_listen(client: Client, args) -> None:
             except TimeoutError:
                 break
             stamp = datetime.now().strftime("%H:%M:%S")
+            if frame is not None and (
+                (args.nad and frame.from_nad not in args.nad)
+                or (args.id and frame.msg_type not in args.id)
+            ):
+                continue
             if frame is None:
                 print(f"{stamp} {addr[0]}:{addr[1]} INVALID ({error}) {raw.hex()}")
                 seen[("invalid", addr[0])] += 1
@@ -648,6 +656,91 @@ async def cmd_maxframe(client: Client, args) -> None:
         )
 
 
+def socket_body(items: list[tuple[dict, str]], offset: int = 0) -> bytes:
+    """Pack (variable, value) like a socket: bits, then ints, then longs/reals.
+
+    offset is added to every non-BIT value and toggles bits on odd offsets,
+    so each matrix variant writes values of its own.
+    """
+    body = b""
+    for size in (1, 2, 4):
+        for var, text in items:
+            if var["size"] != size:
+                continue
+            if var["type"] == "REAL":
+                value: object = float(text) + offset
+            elif var["type"] == "BIT":
+                value = int(text) ^ (offset & 1)
+            else:
+                value = int(text) + offset
+            body += struct.pack(TYPE_FORMATS[var["type"]], value)
+    return body
+
+
+def _expected(items: list[tuple[dict, str]], offset: int) -> dict[str, str]:
+    body = socket_body(items, offset)
+    pos, result = 0, {}
+    for size in (1, 2, 4):
+        for var, _ in items:
+            if var["size"] == size:
+                (value,) = struct.unpack_from(TYPE_FORMATS[var["type"]], body, pos)
+                result[var["name"]] = format_value(value, var["type"])
+                pos += size
+    return result
+
+
+async def cmd_send_socket(client: Client, args) -> None:
+    """S9: send a socket frame to a controller and read the variables back."""
+    plc = Controller(client, args.nad, args.ip)
+    await plc.ping()
+    files = await plc.files()
+    variables = {v["name"]: v for v in parse_alc(await plc.alc_text(files))}
+    items = []
+    for pair in args.values:
+        name, _, text = pair.partition("=")
+        if name not in variables or not text:
+            raise AbusError(f"{pair!r}: use name=value with a name from the ALC")
+        items.append((variables[name], text))
+    wanted = [var for var, _ in items]
+    to_nads = [0, args.nad] if args.matrix else [args.to_nad]
+    targets = ["unicast", "broadcast"] if args.matrix else [args.mode]
+    variants = list(itertools.product(to_nads, targets))
+    print(f"c{args.nad} at {plc.ip}, socket {args.id}, from NAD {args.from_nad}")
+    before = await plc.read_random(wanted)
+    shown = (
+        f"{v['name']}={format_value(before[v['name']], v['type'])}" for v in wanted
+    )
+    print("before: " + ", ".join(shown))
+    results = []
+    for offset, (to_nad, mode) in enumerate(variants, start=1):
+        body = bytes.fromhex(args.body) if args.body else socket_body(items, offset)
+        frame = Frame(args.from_nad, to_nad, args.txn, args.direction, args.id, body)
+        addr = (plc.ip, client.target_port) if mode == "unicast" else client.broadcast
+        queue: asyncio.Queue = asyncio.Queue()
+        waiter = (lambda f: f.from_nad == args.nad, queue)
+        client.endpoint.waiters.append(waiter)
+        print(f"\nvariant {offset}: to_nad={to_nad} {mode} -> {addr[0]}:{addr[1]}")
+        print(f"  sent {frame}")
+        client.endpoint.send(frame, addr)
+        await asyncio.sleep(args.wait)
+        client.endpoint.waiters.remove(waiter)
+        while not queue.empty():
+            answer, src, _ = queue.get_nowait()
+            print(f"  frame from {src[0]}:{src[1]}: {answer.kind}: {answer}")
+        values = await plc.read_random(wanted)
+        got = {v["name"]: format_value(values[v["name"]], v["type"]) for v in wanted}
+        expected = {} if args.body else _expected(items, offset)
+        for name, text in got.items():
+            mark = "" if not expected else (" ok" if expected[name] == text else " -")
+            print(f"  {name} = {text}{mark}")
+        accepted = bool(expected) and got == expected
+        results.append((to_nad, mode, accepted))
+    if not args.body:
+        print("\nSummary (to_nad, mode): accepted")
+        for to_nad, mode, accepted in results:
+            print(f"  ({to_nad}, {mode}): {'YES' if accepted else 'no'}")
+
+
 def _rtt_stats(rtts: list[float]) -> dict:
     if not rtts:
         return {}
@@ -698,6 +791,8 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     p = sub.add_parser("listen", parents=[common], help="S3/S7: unsolicited frames")
     p.add_argument("--seconds", type=float, default=600)
     p.add_argument("--ack-push", action="store_true", help="acknowledge pushes")
+    p.add_argument("--nad", type=int, nargs="+", help="only frames from these NADs")
+    p.add_argument("--id", type=int, nargs="+", help="only these message types")
     p = sub.add_parser("info", parents=[common], help="S1/S4/S6: controller info")
     target(p)
     p.add_argument(
@@ -709,6 +804,18 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     p.add_argument("names", nargs="*", help="variable names without cNAD.")
     p = sub.add_parser("maxframe", parents=[common], help="S6: max frame size")
     target(p)
+    p = sub.add_parser("send-socket", parents=[common], help="S9: send a socket")
+    target(p)
+    p.add_argument("--id", type=int, required=True, help="socket id")
+    p.add_argument("--to-nad", type=int, default=0, help="target NAD in the frame")
+    p.add_argument("--from-nad", type=int, default=SOURCE_NAD, help="sender NAD")
+    p.add_argument("--txn", type=int, default=0, help="transaction id / password")
+    p.add_argument("--direction", type=int, default=ACK, help="0=REQ, 1=ACK")
+    p.add_argument("--mode", choices=("unicast", "broadcast"), default="unicast")
+    p.add_argument("--matrix", action="store_true", help="try to_nad x mode")
+    p.add_argument("--body", help="raw body hex instead of packing the values")
+    p.add_argument("--wait", type=float, default=0.5, help="seconds before readback")
+    p.add_argument("values", nargs="+", help="name=value in socket order")
 
     args = parser.parse_args(argv)
     if args.command == "listen" and args.port == 0:
@@ -752,6 +859,7 @@ async def run(args: argparse.Namespace) -> int:
         "info": cmd_info,
         "read": cmd_read,
         "maxframe": cmd_maxframe,
+        "send-socket": cmd_send_socket,
     }
     try:
         await commands[args.command](client, args)
