@@ -10,6 +10,8 @@ merged pull requests.
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-10-26
+
 ### Added
 
 - Cybro sockets in direct mode, checked on a real controller:
@@ -23,7 +25,7 @@ merged pull requests.
     `encode_socket()`, `encode_socket_values()`; `AbusTransport.on_socket()` and
     `send_frame()`; `AbusClient.send_socket()`.
   - `FakeAbusController.receive_sockets` and `sockets` for tests.
-  - [examples/sockets.py](examples/sockets.py): live socket values.
+  - [examples/sockets.py](examples/sockets.py): live socket values. ([#350])
 
 ## [1.0.0] - 2026-10-25
 
@@ -189,7 +191,8 @@ Stable release of 1.0.0b1, no code changes.
 
 - Variables are requested in chunks of 25.
 
-[Unreleased]: https://github.com/killer0071234/python-cybro/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/killer0071234/python-cybro/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/killer0071234/python-cybro/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/killer0071234/python-cybro/compare/v1.0.0b1...v1.0.0
 [1.0.0b1]: https://github.com/killer0071234/python-cybro/compare/v0.4.1...v1.0.0b1
 [0.4.1]: https://github.com/killer0071234/python-cybro/compare/v0.4.0...v0.4.1
@@ -226,3 +229,4 @@ Stable release of 1.0.0b1, no code changes.
 [#334]: https://github.com/killer0071234/python-cybro/pull/334
 [#335]: https://github.com/killer0071234/python-cybro/pull/335
 [#347]: https://github.com/killer0071234/python-cybro/pull/347
+[#350]: https://github.com/killer0071234/python-cybro/pull/350

@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "cybro"
-version = "1.0.0"
+version = "1.1.0"
 description = "Asynchronous Python client for Cybro PLCs: scgi server (v3.2.6 and newer) or direct A-bus/UDP."
 authors = ["Daniel Gangl <killer007@gmx.at>"]
 maintainers = ["Daniel Gangl <killer007@gmx.at>"]
