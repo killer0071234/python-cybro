@@ -202,7 +202,7 @@ negative values and the INT/LONG maximum. See `docs/abus-notes.md`.
 
 ### Phase 4: Docs + release
 
-- [ ] **T7 (S) README "Sockets" section, `examples/sockets.py`, exports** in
+- [x] **T7 (S) README "Sockets" section, `examples/sockets.py`, exports** in
       `cybro.abus.__init__` (`SocketDef`, `SocketMessage`) and the changelog.
       The release is a minor version (1.1.0), because the API is only added to.
 
