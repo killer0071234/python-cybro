@@ -178,9 +178,9 @@ definition + values.
       without an exception. Two `CybroDirect` on one transport only see their
       own NAD.
 
-**Checkpoint 2:** a real controller (c8372, sockets 3/11/23 every ~2 s) shows
-live values with `examples/sockets.py` once its definitions are known. Needs
-the CyPro socket definitions of c8372 from the maintainer.
+**Checkpoint 2 (passed 2026-10-26):** c10000 socket 63 shows live, typed
+values with `examples/sockets.py` (installed from the branch on a LAN
+machine). The socket values match the next poll. See `docs/abus-notes.md`.
 
 ### Phase 3: Send (fields from S9)
 

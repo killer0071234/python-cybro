@@ -97,6 +97,17 @@ send-socket`, values read back with READ_RANDOM:
   within ~2 s). Cause unknown: lost broadcast, or a minimum send interval in
   the controller. **So on-change sockets can be missed: keep polling as the
   fallback.** Same program (2026-10-26 09:58:00) during all tests.
+- **Checkpoint 2 (10:55, `examples/sockets.py`, library from `feat/sockets`):**
+
+  ```text
+  10:55:32.101 poll: test_sock_bool=1, test_sock_int=4344, test_sock_long=434344, test_sock_real=44.5
+  10:55:40.646 socket 63 from 192.168.10.219: test_sock_bool=0, test_sock_int=4344, test_sock_long=434344, test_sock_real=44.5
+  10:55:42.128 poll: test_sock_bool=0, test_sock_int=4344, test_sock_long=434344, test_sock_real=44.5
+  ```
+
+  `CybroDirect` decodes the socket with the ALC types, same text as the poll.
+  The change 0 → 1 between the polls at 10:55:21 and :32 sent no frame
+  (another missed on-change socket).
 - Earlier attempt from the devcontainer: socket 63 frames don't reach it
   (they are LAN broadcasts, Docker NAT drops them). The "Terminal & SSH"
   add-on on 192.168.10.201 isn't on the host network and has no python3.
