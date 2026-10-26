@@ -191,6 +191,11 @@ machine). The socket values match the next poll. See `docs/abus-notes.md`.
       _Done when:_ tests cover OK, unknown variable, value out of range, missing
       slot value, and plc status not ok. The value round-trips through the fake.
 
+- [x] **T6a (S) Send by type, without names.** `encode_socket_values(bits,
+      ints, longs, reals)` and `CybroDirect.send_socket_values(socket_id, ...)`:
+      counts are the list lengths, body order bits → ints → longs → reals, no
+      ALC needed. Asked for by the maintainer 2026-10-26.
+
 **Checkpoint 3 (passed 2026-10-26):** `CybroDirect.send_socket` to socket 64
 of c10000 changes all four variables (read back with `read_var`), also
 negative values and the INT/LONG maximum. See `docs/abus-notes.md`.

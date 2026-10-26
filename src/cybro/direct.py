@@ -12,7 +12,8 @@ work unchanged. Behaviour follows the Edge Toolkit's scgi_server:
 Socket frames of definitions added with add_socket() update device.vars as
 they arrive and go to the on_socket() callbacks (only while the transport is
 bound to port 8442). They can be missed, so keep calling update().
-send_socket() sends values to a receive socket of the PLC program.
+send_socket() sends values to a receive socket of the PLC program,
+send_socket_values() does the same when only the types are known.
 
 Unlike the scgi server, a controller that doesn't answer raises
 CybroConnectionTimeoutError (there is no server that could answer instead).
@@ -24,6 +25,7 @@ import asyncio
 import logging
 import time
 from collections.abc import Callable
+from collections.abc import Iterable
 from collections.abc import Mapping
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version
@@ -39,8 +41,10 @@ from .abus.client import AbusResponseError
 from .abus.frame import Frame
 from .abus.sockets import SocketDef
 from .abus.sockets import SocketMessage
+from .abus.sockets import check_socket_id
 from .abus.sockets import decode_socket
 from .abus.sockets import encode_socket
+from .abus.sockets import encode_socket_values
 from .abus.transport import AbusTransport
 from .abus.transport import Addr
 from .cybro import Cybro
@@ -169,6 +173,32 @@ class CybroDirect(Cybro):
             except (ValueError, AbusError) as err:
                 raise CybroError(str(err)) from err
             await self.client.send_socket(definition.socket_id, body)
+
+    async def send_socket_values(
+        self,
+        socket_id: int,
+        bits: Iterable[str | int] = (),
+        ints: Iterable[str | int] = (),
+        longs: Iterable[str | int] = (),
+        reals: Iterable[str | float] = (),
+    ) -> None:
+        """Send values by type to a socket of the PLC, without names.
+
+        The PLC's receive socket must have exactly these counts, in the order
+        bits, ints, longs, reals. No ALC is needed. The PLC doesn't answer, so
+        a lost frame isn't noticed.
+
+        Raises:
+            ValueError: The socket id is invalid.
+            CybroError: A value is invalid or there are no values.
+            CybroConnectionTimeoutError: The controller doesn't answer.
+        """
+        check_socket_id(socket_id)
+        try:
+            body = encode_socket_values(bits, ints, longs, reals)
+        except ValueError as err:
+            raise CybroError(str(err)) from err
+        await self.client.send_socket(socket_id, body)
 
     async def disconnect(self) -> None:
         """Stop the socket handling (definitions are removed)."""

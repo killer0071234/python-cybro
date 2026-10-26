@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import re
 import struct
+from collections.abc import Iterable
 from collections.abc import Iterator
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -59,8 +60,10 @@ class SocketDef:
             number = int(socket_id)
         except ValueError:
             raise ValueError(f"socket {text!r}: invalid id {socket_id!r}") from None
-        if not 0 < number <= 0xFF or number in (TYPE_COMMAND, TYPE_BROADCAST):
-            raise ValueError(f"socket {text!r}: id must be 1..255, except 100")
+        try:
+            check_socket_id(number)
+        except ValueError as err:
+            raise ValueError(f"socket {text!r}: {err}") from None
         names = [_parse_group(text, group) for group in groups]
         definition = cls(number, *names)
         all_names = [name for name, _ in definition.slots()]
@@ -147,6 +150,43 @@ def encode_socket(
             raise ValueError(f"{name}: {err}") from err
         body += struct.pack(data_type.fmt, value)
     return body
+
+
+def encode_socket_values(
+    bits: Iterable[str | int] = (),
+    ints: Iterable[str | int] = (),
+    longs: Iterable[str | int] = (),
+    reals: Iterable[str | float] = (),
+) -> bytes:
+    """Return a socket body for values by type, when the names are unknown.
+
+    The body order is bits, ints, longs, reals; it must match the receive
+    socket of the PLC program. Values are checked like a written variable.
+    Raises ValueError for an empty socket or an invalid value.
+    """
+    body = b""
+    for group, data_type in (
+        (bits, DataType.BIT),
+        (ints, DataType.INT),
+        (longs, DataType.LONG),
+        (reals, DataType.REAL),
+    ):
+        for index, value in enumerate(group):
+            label = f"{data_type.name.lower()}s[{index}]"
+            try:
+                number = parse_value(str(value), data_type)
+            except ValueError as err:
+                raise ValueError(f"{label}: {err}") from err
+            body += struct.pack(data_type.fmt, number)
+    if not body:
+        raise ValueError("socket has no values")
+    return body
+
+
+def check_socket_id(socket_id: int) -> None:
+    """Raise ValueError unless socket_id is 1..255 (100 is the broadcast type)."""
+    if not 0 < socket_id <= 0xFF or socket_id in (TYPE_COMMAND, TYPE_BROADCAST):
+        raise ValueError(f"socket id must be 1..255, except 100 (got {socket_id})")
 
 
 def _parse_group(text: str, group: str) -> tuple[str, ...]:

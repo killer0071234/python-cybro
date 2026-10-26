@@ -636,3 +636,32 @@ async def test_send_socket_plc_not_ok(
         await cybro.send_socket(SOCKET, SOCKET_VALUES)
     with pytest.raises(ValueError, match="id must be"):
         await cybro.send_socket("0; cybro_qx00", {"cybro_qx00": 1})
+
+
+@pytest.mark.asyncio
+async def test_send_socket_values(
+    transport: AbusTransport, fake: FakeAbusController
+) -> None:
+    """Values by type need no names and no ALC (no update() before)."""
+    fake.receive_sockets[64] = SocketDef.parse(SOCKET.replace("7;", "64;"))
+    cybro = CybroDirect(transport, NAD)  # IP found by broadcast
+    await cybro.send_socket_values(64, bits=[1], ints=[-42], longs=[70000], reals=[1.5])
+    await deliver()
+    assert {name: fake[name] for name in SOCKET_VALUES} == SOCKET_VALUES
+    assert fake.sockets[-1].body == socket_body()
+    assert [frame.body[0] for frame in fake.requests] == [Command.PING]
+
+
+@pytest.mark.asyncio
+async def test_send_socket_values_invalid(
+    cybro: CybroDirect, fake: FakeAbusController
+) -> None:
+    """A bad id raises ValueError, bad values CybroError; nothing is sent."""
+    with pytest.raises(ValueError, match="id must be"):
+        await cybro.send_socket_values(100, bits=[1])
+    with pytest.raises(CybroError, match=r"ints\[0\]: 40000 is out of range"):
+        await cybro.send_socket_values(64, ints=[40000])
+    with pytest.raises(CybroError, match="no values"):
+        await cybro.send_socket_values(64)
+    await deliver()
+    assert fake.sockets == []

@@ -119,6 +119,16 @@ send-socket`, values read back with READ_RANDOM:
   refused: CybroError test_sock_int: 40000 is out of range for INT
   ```
 
+- **Send by type** (`CybroDirect.send_socket_values(64, bits=…, ints=…,
+  longs=…, reals=…)`, no names, no ALC):
+
+  ```text
+  before       ['0', '32767', '2147483647', '3.5']
+  by type      ['1', '-7', '-70000', '0.75']
+  as text      ['0', '123', '456', '7.5']
+  short body   ['0', '123', '456', '7.5']   (bits=[1], ints=[999]: ignored)
+  ```
+
 - Earlier attempt from the devcontainer: socket 63 frames don't reach it
   (they are LAN broadcasts, Docker NAT drops them). The "Terminal & SSH"
   add-on on 192.168.10.201 isn't on the host network and has no python3.

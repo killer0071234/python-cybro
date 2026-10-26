@@ -7,8 +7,10 @@ import pytest
 from src.cybro.abus.alc import DataType
 from src.cybro.abus.alc import parse_alc
 from src.cybro.abus.sockets import SocketDef
+from src.cybro.abus.sockets import check_socket_id
 from src.cybro.abus.sockets import decode_socket
 from src.cybro.abus.sockets import encode_socket
+from src.cybro.abus.sockets import encode_socket_values
 from src.cybro.exceptions import AbusError
 
 # test program on c10000 (docs/abus-notes.md, S9)
@@ -190,3 +192,40 @@ def test_encode_type_mismatch() -> None:
     """Encoding checks the ALC types like decoding."""
     with pytest.raises(AbusError, match="test_sock_real"):
         encode_socket(SocketDef.parse("1;; test_sock_real"), {"test_sock_real": 1}, ALC)
+
+
+def test_encode_values() -> None:
+    """Values by type give the same body as the named definition."""
+    body = encode_socket_values(bits=[1], ints=[4344], longs=[434344], reals=[44.5])
+    assert body == TEST_BODY
+    texts = encode_socket_values(
+        bits=["1"], ints=["4344"], longs=["434344"], reals=["44.5"]
+    )
+    assert texts == TEST_BODY
+    assert encode_socket_values(reals=[1]) == bytes.fromhex("0000803f")
+    assert encode_socket_values(longs=[1]) == bytes.fromhex("01000000")
+
+
+@pytest.mark.parametrize(
+    ("values", "match"),
+    [
+        ({}, "no values"),
+        ({"bits": [], "reals": []}, "no values"),
+        ({"bits": [0, 2]}, r"bits\[1\]: 2 is out of range for BIT"),
+        ({"ints": [40000]}, r"ints\[0\]: 40000 is out of range for INT"),
+        ({"longs": [2**31]}, r"longs\[0\]: .* out of range for LONG"),
+        ({"reals": ["x"]}, r"reals\[0\]: invalid value 'x' for REAL"),
+    ],
+)
+def test_encode_values_invalid(values: dict, match: str) -> None:
+    """Empty sockets and invalid values are refused with their position."""
+    with pytest.raises(ValueError, match=match):
+        encode_socket_values(**values)
+
+
+@pytest.mark.parametrize("socket_id", [0, 100, 256, -1])
+def test_check_socket_id(socket_id: int) -> None:
+    """Socket ids are 1..255 without the broadcast type 100."""
+    with pytest.raises(ValueError, match="id must be"):
+        check_socket_id(socket_id)
+    check_socket_id(64)
