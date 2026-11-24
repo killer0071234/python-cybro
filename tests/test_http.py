@@ -218,6 +218,7 @@ async def test_request_uses_path_from_host(aresponses: ResponsesMockServer) -> N
         ("192.168.1.10:4001", "192.168.1.10", 4001, "/"),
         ("http://192.168.1.10:4001/scgi", "192.168.1.10", 4001, "/scgi"),
         ("[::1]:4001", "::1", 4001, "/"),
+        ("192.168.1.10/scgi%2Fproxy", "192.168.1.10", 4000, "/scgi%2Fproxy"),
     ],
 )
 def test_host_string(host_str: str, host: str, port: int, path: str) -> None:
@@ -237,6 +238,29 @@ async def test_request_uses_port_from_host(aresponses: ResponsesMockServer) -> N
     await cybro.disconnect()
 
     aresponses.assert_plan_strictly_followed()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("path", "sent"),
+    [("/scgi%2Fproxy", "/scgi%2Fproxy"), ("/räume", "/r%C3%A4ume"), ("/a b", "/a%20b")],
+)
+async def test_request_sends_path_as_given(
+    aresponses: ResponsesMockServer, path: str, sent: str
+) -> None:
+    """Percent-escapes in the path are sent as given, never encoded twice."""
+    raw_paths: list[str] = []
+
+    async def handler(request: web.Request) -> web.Response:
+        raw_paths.append(request.raw_path)
+        return web.Response(text="<data></data>")
+
+    aresponses.add(f"{HOST}:4000", response=handler)
+    cybro = Cybro(f"{HOST}{path}")
+    await cybro.request(data="sys.server_version")
+    await cybro.disconnect()
+
+    assert raw_paths == [f"{sent}?sys.server_version"]
 
 
 def test_clients_are_hashable_and_distinct() -> None:

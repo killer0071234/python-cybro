@@ -80,7 +80,7 @@ class Cybro:
         """
         url = URL(host_str if "//" in host_str else f"//{host_str}")
         self.host = url.host
-        self.path = url.path
+        self.path = url.raw_path  # percent-escapes as given, e.g. %2F
         self.port = url.explicit_port or port
         self.nad = nad
         if session is not None:
@@ -123,8 +123,8 @@ class Cybro:
                 with the scgi server.
             CybroError: Received an unexpected response from Cybro scgi server.
         """
-        base_url = URL.build(
-            scheme="http", host=self.host, port=self.port, path=self.path
+        base_url = URL.build(scheme="http", host=self.host, port=self.port).with_path(
+            self.path, encoded=True
         )
         url = URL(f"{base_url}?{_build_query(data)}", encoded=True)
 
