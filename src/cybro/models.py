@@ -31,33 +31,65 @@ def _parse_nad_list(value: dict[str, Any] | None) -> list[str]:
     return [items]
 
 
+def _values(variables: dict[str, Var]) -> dict[str, str]:
+    """Return the values of Var objects by name."""
+    return {name: var.value for name, var in variables.items()}
+
+
+# fields read from "sys.<field>" (nad_list is parsed separately)
+_SERVER_FIELDS = (
+    "server_uptime",
+    "scgi_request_count",
+    "push_port_status",
+    "push_count",
+    "push_ack_errors",
+    "push_list_count",
+    "cache_request",
+    "cache_valid",
+    "server_version",
+    "udp_rx_count",
+    "udp_tx_count",
+)
+
+# fields read from "c<nad>.sys.<field>"
+_PLC_FIELDS = (
+    "ip_port",
+    "timestamp",
+    "plc_status",
+    "response_time",
+    "bytes_transferred",
+    "com_error_count",
+    "alc_file",
+)
+
+
 @dataclass
 class ServerInfo:  # pylint:
     """Cybro scgi server information."""
 
     server_uptime: str
     """server uptime, returned as "dd days, hh:mm:ss"""
-    scgi_request_count: int
+    scgi_request_count: str
     """total number of requests served since server is started"""
     push_port_status: str
     """- "error", port already used by another application
     - "inactive", push disabled by configuration file
     - "active", push server is up and running"""
-    push_count: int
+    push_count: str
     """total number of push messages received from controllers"""
-    push_ack_errors: int
+    push_ack_errors: str
     """total number of push acknowledge errors"""
-    push_list_count: int
+    push_list_count: str
     """total number of controllers in push list"""
-    cache_request: int
+    cache_request: str
     """configured read request time [s]"""
-    cache_valid: int
+    cache_valid: str
     """configured cache validity time [s]"""
     server_version: str
     """returns "major.minor.release" """
-    udp_rx_count: int
+    udp_rx_count: str
     """total number of messages received through UDP proxy"""
-    udp_tx_count: int
+    udp_tx_count: str
     """total number of messages transmitted through UDP proxy"""
     nad_list: list[str]
     """active controllers, including static, push and autodetect"""
@@ -83,22 +115,11 @@ class ServerInfo:  # pylint:
             CybroError: The Cybro SCGI server returned no or incomplete Server info data.
         """
         try:
-            return ServerInfo(
-                server_uptime=data["sys.server_uptime"],
-                scgi_request_count=data["sys.scgi_request_count"],
-                push_port_status=data["sys.push_port_status"],
-                push_count=data["sys.push_count"],
-                push_ack_errors=data["sys.push_ack_errors"],
-                push_list_count=data["sys.push_list_count"],
-                cache_request=data["sys.cache_request"],
-                cache_valid=data["sys.cache_valid"],
-                server_version=data["sys.server_version"],
-                udp_rx_count=data["sys.udp_rx_count"],
-                udp_tx_count=data["sys.udp_tx_count"],
-                nad_list=_parse_nad_list(data["sys.nad_list"]),
-            )
+            values = {name: data[f"sys.{name}"] for name in _SERVER_FIELDS}
+            nad_list = _parse_nad_list(data["sys.nad_list"])
         except KeyError as err:
             raise CybroError("Not all ServerInfo tags found in data") from err
+        return ServerInfo(**values, nad_list=nad_list)
 
     @staticmethod
     def from_vars(variables: dict[str, Var]) -> ServerInfo:
@@ -113,23 +134,7 @@ class ServerInfo:  # pylint:
         Raises:
             CybroError: The Cybro scgi server returned no or incomplete Server info data.
         """
-        try:
-            return ServerInfo(
-                server_uptime=variables.get("sys.server_uptime").value,
-                scgi_request_count=variables.get("sys.scgi_request_count").value,
-                push_port_status=variables.get("sys.push_port_status").value,
-                push_count=variables.get("sys.push_count").value,
-                push_ack_errors=variables.get("sys.push_ack_errors").value,
-                push_list_count=variables.get("sys.push_list_count").value,
-                cache_request=variables.get("sys.cache_request").value,
-                cache_valid=variables.get("sys.cache_valid").value,
-                server_version=variables.get("sys.server_version").value,
-                udp_rx_count=variables.get("sys.udp_rx_count").value,
-                udp_tx_count=variables.get("sys.udp_tx_count").value,
-                nad_list=_parse_nad_list(variables.get("sys.nad_list").value),
-            )
-        except AttributeError as err:
-            raise CybroError("Not all ServerInfo tags found in data") from err
+        return ServerInfo.from_dict(_values(variables))
 
 
 @dataclass
@@ -150,9 +155,9 @@ class PlcInfo:  # pylint:
     - "?", status of the controller is unknown"""
     response_time: str
     """number of milliseconds elapsed between request and response"""
-    bytes_transferred: int
+    bytes_transferred: str
     """number of bytes, read and write, transferred between server and controller"""
-    com_error_count: int
+    com_error_count: str
     """total number of communication errors encountered by controller"""
     alc_file: str
     """allocation file, directly from the Cybro file system"""
@@ -173,29 +178,21 @@ class PlcInfo:  # pylint:
         Raises:
             CybroPlcNotFoundError: The Cybro scgi server returned no or incomplete PLC data.
         """
+        prefix = f"c{plc_nad}.sys."
         try:
-            return PlcInfo(
-                nad=plc_nad,
-                ip_port=data["c" + str(plc_nad) + ".sys.ip_port"],
-                timestamp=data["c" + str(plc_nad) + ".sys.timestamp"],
-                plc_status=data["c" + str(plc_nad) + ".sys.plc_status"],
-                response_time=data["c" + str(plc_nad) + ".sys.response_time"],
-                bytes_transferred=data["c" + str(plc_nad) + ".sys.bytes_transferred"],
-                com_error_count=data["c" + str(plc_nad) + ".sys.com_error_count"],
-                alc_file=data["c" + str(plc_nad) + ".sys.alc_file"],
-                plc_vars={},
-            )
+            values = {name: data[prefix + name] for name in _PLC_FIELDS}
         except KeyError as err:
             raise CybroPlcNotFoundError(
                 f"Not all PlcInfo tags found in data for NAD {plc_nad}"
             ) from err
+        return PlcInfo(nad=plc_nad, **values, plc_vars={})
 
     @staticmethod
     def from_vars(variables: dict[str, Var], plc_nad: int) -> PlcInfo:
         """Generate PlcInfo object out of name / Var object dictionary.
 
         Args:
-            variables: Force a full update from the device Device.
+            variables: Variables read from the scgi server, by name.
             plc_nad: Address of PLC
 
         Returns:
@@ -204,31 +201,7 @@ class PlcInfo:  # pylint:
         Raises:
             CybroPlcNotFoundError: The Cybro scgi server returned no or incomplete PLC data.
         """
-        nad = plc_nad
-        try:
-            return PlcInfo(
-                nad=nad,
-                ip_port=variables.get("c" + str(plc_nad) + ".sys.ip_port", "").value,
-                timestamp=variables.get(
-                    "c" + str(plc_nad) + ".sys.timestamp", ""
-                ).value,
-                plc_status=variables.get(
-                    "c" + str(plc_nad) + ".sys.plc_status", ""
-                ).value,
-                response_time=variables.get(
-                    "c" + str(plc_nad) + ".sys.response_time", ""
-                ).value,
-                bytes_transferred=variables.get(
-                    "c" + str(plc_nad) + ".sys.bytes_transferred", ""
-                ).value,
-                com_error_count=variables.get(
-                    "c" + str(plc_nad) + ".sys.com_error_count", ""
-                ).value,
-                alc_file=variables.get("c" + str(plc_nad) + ".sys.alc_file", "").value,
-                plc_vars={},
-            )
-        except AttributeError as err:
-            raise CybroPlcNotFoundError(f"Cybro PLC with NAD {nad} not found") from err
+        return PlcInfo.from_dict(_values(variables), plc_nad)
 
     def parse_alc_file(self) -> dict[str, str]:
         """Refresh the list of all PLC variables; call after an update of PlcInfo."""
@@ -259,12 +232,6 @@ class Var:
     """value as string of variable"""
     description: str
     """description of the variable"""
-
-    def __init__(self, name: str, value: str, description: str) -> None:
-        """Initialize a variable with its name, value and description."""
-        self.name = name
-        self.value = value
-        self.description = description
 
     @staticmethod
     def from_dict(data: dict[str, Any]) -> Var:
@@ -415,10 +382,10 @@ class Device:
             returned no value or one that cannot be converted
         """
         try:
-            for _var in data["var"]:
-                if _var == "name":
-                    # single var entry found
-                    _var = data["var"]
+            _vars = data["var"]
+            if isinstance(_vars, dict):  # a single variable is not in a list
+                _vars = [_vars]
+            for _var in _vars:
                 if not self._store_var(_var):
                     continue
                 self.vars_types.update({_var["name"]: var_type})
