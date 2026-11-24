@@ -18,6 +18,13 @@ merged pull requests.
 
 - CI installs its dependencies again on Python 3.13 and 3.14: `cffi` (a development
   dependency) updated from 1.16.0 to 2.1.1. ([#377])
+- `Cybro` accepts a port in the host string, e.g. `Cybro("192.168.1.10:4001")` or
+  `Cybro("http://192.168.1.10:4001/scgi")`; it raised `ValueError` before. A port in
+  the host string wins over the `port` argument.
+- A reply of the scgi server that isn't XML (e.g. an HTML page of a proxy, or an empty
+  body) raises `CybroError` instead of `xml.parsers.expat.ExpatError`.
+- `Cybro` and `CybroDirect` objects can be used as dict keys and in sets again. Two
+  clients are no longer equal just because they connect to the same host.
 
 ## [1.1.0] - 2026-10-26
 

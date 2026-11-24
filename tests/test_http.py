@@ -209,6 +209,60 @@ async def test_request_uses_path_from_host(aresponses: ResponsesMockServer) -> N
     aresponses.assert_plan_strictly_followed()
 
 
+@pytest.mark.parametrize(
+    ("host_str", "host", "port", "path"),
+    [
+        ("192.168.1.10", "192.168.1.10", 4000, "/"),
+        ("192.168.1.10/scgi", "192.168.1.10", 4000, "/scgi"),
+        ("http://192.168.1.10/scgi", "192.168.1.10", 4000, "/scgi"),
+        ("192.168.1.10:4001", "192.168.1.10", 4001, "/"),
+        ("http://192.168.1.10:4001/scgi", "192.168.1.10", 4001, "/scgi"),
+        ("[::1]:4001", "::1", 4001, "/"),
+    ],
+)
+def test_host_string(host_str: str, host: str, port: int, path: str) -> None:
+    """Host, port and path are taken from the host string."""
+    cybro = Cybro(host_str)
+
+    assert (cybro.host, cybro.port, cybro.path) == (host, port, path)
+
+
+@pytest.mark.asyncio
+async def test_request_uses_port_from_host(aresponses: ResponsesMockServer) -> None:
+    """A port in the host string wins over the port argument."""
+    fake = FakeScgiServer()
+    aresponses.add(f"{HOST}:8080", "/scgi", "GET", fake.handler)
+    cybro = Cybro(f"{HOST}:8080/scgi", port=4000, nad=NAD)
+    await cybro.request(data="sys.server_version")
+    await cybro.disconnect()
+
+    aresponses.assert_plan_strictly_followed()
+
+
+def test_clients_are_hashable_and_distinct() -> None:
+    """Two clients for the same host are different objects, usable as keys."""
+    first, second = Cybro(HOST), Cybro(HOST)
+
+    assert first != second
+    assert len({first, second}) == 2
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("text", ["<html><body>login</body></html", ""])
+async def test_request_invalid_xml(aresponses: ResponsesMockServer, text: str) -> None:
+    """A reply that isn't XML raises CybroError and is not retried."""
+    aresponses.add(
+        f"{HOST}:4000",
+        response=aresponses.Response(text=text, content_type="text/html"),
+    )
+    cybro = Cybro(HOST, nad=NAD)
+    with pytest.raises(CybroError, match="invalid XML"):
+        await cybro.request(data="sys.server_version")
+    await cybro.disconnect()
+
+    aresponses.assert_plan_strictly_followed()
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("status", "attempts"), [(400, 1), (404, 1), (500, 3), (503, 3)]

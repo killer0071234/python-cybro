@@ -5,10 +5,10 @@ from __future__ import annotations
 import asyncio
 import json
 import socket
-from dataclasses import dataclass
 from itertools import islice
 from typing import Any
 from urllib.parse import quote
+from xml.parsers.expat import ExpatError
 
 import aiohttp
 import backoff
@@ -28,7 +28,6 @@ VERSION_CACHE: TTLCache = TTLCache(maxsize=16, ttl=7200)
 VAR_CHUNK_SIZE: int = 25
 
 
-@dataclass
 class Cybro:
     """Main class for handling connections with Cybro scgi server."""
 
@@ -53,22 +52,16 @@ class Cybro:
         """Define a new Cybro scgi server session.
 
         Args:
-            host_str: Cybro scgi server connection string
-            port: Cybro scgi server port (Default: 4000)
+            host_str: Cybro scgi server connection string, e.g. "192.168.1.10",
+                "192.168.1.10:4000" or "http://192.168.1.10:4000/scgi"
+            port: Cybro scgi server port, if host_str has none (Default: 4000)
             nad: Cybro PLC NAD (Network address)
             session: optional aiohttp session; it is not closed by disconnect()
         """
-        new_host = host_str
-        new_path = ""
-        if new_host.find("//") >= 0:
-            new_host = new_host.split("//")[1]
-        if new_host.find("/") >= 0:
-            new_path = "/" + "/".join(new_host.split("/")[1:])
-            new_host = new_host.split("/")[0]
-        url = URL.build(scheme="http", host=new_host, path=new_path)
+        url = URL(host_str if "//" in host_str else f"//{host_str}")
         self.host = url.host
         self.path = url.path
-        self.port = port
+        self.port = url.explicit_port or port
         self.nad = nad
         if session is not None:
             self.session = session
@@ -153,7 +146,12 @@ class Cybro:
                 f"Error occurred while communicating with server at {self.host}:{self.port}"
             ) from exception
 
-        response_data = xmltodict.parse(text)
+        try:
+            response_data = xmltodict.parse(text)
+        except ExpatError as exception:
+            raise CybroError(
+                f"Server at {self.host}:{self.port} returned invalid XML"
+            ) from exception
         return response_data.get("data")
 
     @backoff.on_exception(
