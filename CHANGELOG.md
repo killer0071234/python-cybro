@@ -10,6 +10,15 @@ merged pull requests.
 
 ## [Unreleased]
 
+### Added
+
+- Python 3.15 is supported and tested in CI.
+
+### Fixed
+
+- CI installs its dependencies again on Python 3.13 and 3.14: `cffi` (a development
+  dependency) updated from 1.16.0 to 2.1.1.
+
 ## [1.1.0] - 2026-10-26
 
 ### Added
