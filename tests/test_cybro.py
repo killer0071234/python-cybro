@@ -146,7 +146,7 @@ class TestCybro(IsolatedAsyncioTestCase):
 
     def test_plc_info_from_vars_exception(self) -> None:
         """Check for ServerInfo.from_vars()."""
-        self.assertRaises(CybroPlcNotFoundError, PlcInfo.from_vars, api_resp, 1)
+        self.assertRaises(CybroPlcNotFoundError, PlcInfo.from_vars, var_vars(), 1)
 
     def test_plc_info_parse_alc_file(self) -> None:
         """Check for parsing of alc-file."""
@@ -442,7 +442,8 @@ class TestCybro(IsolatedAsyncioTestCase):
         self.assertEqual(ctx.exception.__cause__.args, ("sys.server_uptime",))
         with self.assertRaises(CybroPlcNotFoundError) as ctx:
             PlcInfo.from_vars({}, 1000)
-        self.assertIsInstance(ctx.exception.__cause__, AttributeError)
+        self.assertIsInstance(ctx.exception.__cause__, KeyError)
+        self.assertEqual(ctx.exception.__cause__.args, ("c1000.sys.ip_port",))
         self.assertIsNotNone(ctx.exception.__cause__.__traceback__)
 
     def test_device_remove_var(self) -> None:

@@ -14,6 +14,12 @@ merged pull requests.
 
 - Python 3.15 is supported and tested in CI. ([#377])
 
+### Changed
+
+- Type hints of the counters in `ServerInfo` (e.g. `scgi_request_count`) and
+  `PlcInfo` (`bytes_transferred`, `com_error_count`) say `str`, as the scgi server
+  returns them; they said `int` before. The values are unchanged.
+
 ### Removed
 
 - The dependency on `cachetools`: it was only imported for an unused cache.
