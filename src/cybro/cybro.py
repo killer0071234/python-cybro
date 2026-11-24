@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import socket
+from collections.abc import AsyncIterator
 from itertools import islice
 from typing import Any
 from urllib.parse import quote
@@ -13,7 +14,6 @@ from xml.parsers.expat import ExpatError
 import aiohttp
 import backoff
 import xmltodict
-from cachetools import TTLCache
 from yarl import URL
 
 from .exceptions import CybroConnectionError
@@ -23,9 +23,29 @@ from .exceptions import CybroError
 from .models import Device
 from .models import VarType
 
-VERSION_CACHE: TTLCache = TTLCache(maxsize=16, ttl=7200)
-
 VAR_CHUNK_SIZE: int = 25
+
+# error and state variables of the HIQ-controller program, read by update()
+_HIQ_TAGS: tuple[str, ...] = (
+    *(f"lc{i:02}_general_error" for i in range(8)),
+    *(f"ld{i:02}_general_error" for i in range(10)),
+    *(f"ld{i:02}_rgb_mode" for i in range(10)),
+    *(f"ld{i:02}_rgb_mode_2" for i in range(10)),
+    *(f"bc{i:02}_general_error" for i in range(6)),
+    *(f"sc{i:02}_general_error" for i in range(4)),
+    *(
+        f"th{i:02}_{name}"
+        for name in ("general_error", "window_enable", "fan_limit", "demand_enable")
+        for i in range(10)
+    ),
+    *(f"fc{i:02}_general_error" for i in range(6)),
+    "power_meter_error",
+    "outdoor_temperature_enable",
+    "wall_temperature_enable",
+    "water_temperature_enable",
+    "auxilary_temperature_enable",
+    "hvac_mode",
+)
 
 
 class Cybro:
@@ -176,7 +196,6 @@ class Cybro:
             CybroEmptyResponseError: The Cybro scgi server returned an empty response.
         """
         if self._device is None or full_update:
-            _data = []
             # read all relevant server vars
             _vars: dict[str, str] = {
                 "sys.server_uptime": "",
@@ -209,49 +228,38 @@ class Cybro:
                 if device_type == 1:
                     _vars = _add_hiq_tags(_vars, _controller)
 
-            # Update system info in chunks
-            _sys_vars = _get_chunk(_vars, self._var_chunk_size)
-            for _vars in _sys_vars:
-                if not (data1 := await self.request(data=_vars)):
-                    raise CybroEmptyResponseError(
-                        f"Cybro scgi server at {self.host}:{self.port} returned an empty API"
-                        " response on full update"
-                    )
-                for var in data1["var"]:
-                    _data.append(var)
-
-            # combine all data into "var" dictionary
-            _data1 = {"var": _data}
+            # Update system info in chunks, combined into one "var" list
+            _data = []
+            async for data in self._request_chunks(_vars, "full update"):
+                _data.extend(data["var"])
             if self._device is None:
-                self._device = Device(_data1, plc_nad=self.nad)
+                self._device = Device({"var": _data}, plc_nad=self.nad)
             else:
-                self._device.update_from_dict(_data1, plc_nad=self.nad)
+                self._device.update_from_dict({"var": _data}, plc_nad=self.nad)
+            action = "full update"
+        else:
+            action = "user update"
 
-            if len(self._device.user_vars) > 0:
-                _user_vars = _get_chunk(self._device.user_vars, self._var_chunk_size)
-                for _vars in _user_vars:
-                    if not (data := await self.request(data=_vars)):
-                        raise CybroEmptyResponseError(
-                            f"Cybro scgi server at {self.host}:{self.port} returned an empty"
-                            " response on full update"
-                        )
-                    self._device.update_user_var_from_dict(data=data)
-
-            return self._device
-
-        if len(self._device.user_vars) > 0:
-            _user_vars = _get_chunk(self._device.user_vars, self._var_chunk_size)
-            for _vars in _user_vars:
-                if not (data := await self.request(data=_vars)):
-                    raise CybroEmptyResponseError(
-                        f"Cybro scgi server at {self.host}:{self.port} returned an empty"
-                        " response on user update"
-                    )
-                self._device.update_user_var_from_dict(data=data)
-
-            return self._device
+        async for data in self._request_chunks(self._device.user_vars, action):
+            self._device.update_user_var_from_dict(data=data)
 
         return self._device
+
+    async def _request_chunks(
+        self, variables: dict[str, str], action: str
+    ) -> AsyncIterator[Any]:
+        """Request variables in chunks, yield the response of each chunk.
+
+        Raises:
+            CybroEmptyResponseError: The scgi server returned an empty response.
+        """
+        for chunk in _get_chunk(variables, self._var_chunk_size):
+            if not (data := await self.request(data=chunk)):
+                raise CybroEmptyResponseError(
+                    f"Cybro scgi server at {self.host}:{self.port} returned an empty"
+                    f" response on {action}"
+                )
+            yield data
 
     async def write_var(
         self, name: str, value: str, var_type: VarType = VarType.STR
@@ -403,105 +411,6 @@ def _add_hiq_tags(
     Returns:
         An updated dictionary of variables that includes HIQ controller specific variables.
     """
-    _vars = variables
-    _vars[controller + "lc00_general_error"] = ""
-    _vars[controller + "lc01_general_error"] = ""
-    _vars[controller + "lc02_general_error"] = ""
-    _vars[controller + "lc03_general_error"] = ""
-    _vars[controller + "lc04_general_error"] = ""
-    _vars[controller + "lc05_general_error"] = ""
-    _vars[controller + "lc06_general_error"] = ""
-    _vars[controller + "lc07_general_error"] = ""
-    _vars[controller + "ld00_general_error"] = ""
-    _vars[controller + "ld01_general_error"] = ""
-    _vars[controller + "ld02_general_error"] = ""
-    _vars[controller + "ld03_general_error"] = ""
-    _vars[controller + "ld04_general_error"] = ""
-    _vars[controller + "ld05_general_error"] = ""
-    _vars[controller + "ld06_general_error"] = ""
-    _vars[controller + "ld07_general_error"] = ""
-    _vars[controller + "ld08_general_error"] = ""
-    _vars[controller + "ld09_general_error"] = ""
-    _vars[controller + "ld00_rgb_mode"] = ""
-    _vars[controller + "ld01_rgb_mode"] = ""
-    _vars[controller + "ld02_rgb_mode"] = ""
-    _vars[controller + "ld03_rgb_mode"] = ""
-    _vars[controller + "ld04_rgb_mode"] = ""
-    _vars[controller + "ld05_rgb_mode"] = ""
-    _vars[controller + "ld06_rgb_mode"] = ""
-    _vars[controller + "ld07_rgb_mode"] = ""
-    _vars[controller + "ld08_rgb_mode"] = ""
-    _vars[controller + "ld09_rgb_mode"] = ""
-    _vars[controller + "ld00_rgb_mode_2"] = ""
-    _vars[controller + "ld01_rgb_mode_2"] = ""
-    _vars[controller + "ld02_rgb_mode_2"] = ""
-    _vars[controller + "ld03_rgb_mode_2"] = ""
-    _vars[controller + "ld04_rgb_mode_2"] = ""
-    _vars[controller + "ld05_rgb_mode_2"] = ""
-    _vars[controller + "ld06_rgb_mode_2"] = ""
-    _vars[controller + "ld07_rgb_mode_2"] = ""
-    _vars[controller + "ld08_rgb_mode_2"] = ""
-    _vars[controller + "ld09_rgb_mode_2"] = ""
-    _vars[controller + "bc00_general_error"] = ""
-    _vars[controller + "bc01_general_error"] = ""
-    _vars[controller + "bc02_general_error"] = ""
-    _vars[controller + "bc03_general_error"] = ""
-    _vars[controller + "bc04_general_error"] = ""
-    _vars[controller + "bc05_general_error"] = ""
-    _vars[controller + "sc00_general_error"] = ""
-    _vars[controller + "sc01_general_error"] = ""
-    _vars[controller + "sc02_general_error"] = ""
-    _vars[controller + "sc03_general_error"] = ""
-    _vars[controller + "th00_general_error"] = ""
-    _vars[controller + "th01_general_error"] = ""
-    _vars[controller + "th02_general_error"] = ""
-    _vars[controller + "th03_general_error"] = ""
-    _vars[controller + "th04_general_error"] = ""
-    _vars[controller + "th05_general_error"] = ""
-    _vars[controller + "th06_general_error"] = ""
-    _vars[controller + "th07_general_error"] = ""
-    _vars[controller + "th08_general_error"] = ""
-    _vars[controller + "th09_general_error"] = ""
-    _vars[controller + "th00_window_enable"] = ""
-    _vars[controller + "th01_window_enable"] = ""
-    _vars[controller + "th02_window_enable"] = ""
-    _vars[controller + "th03_window_enable"] = ""
-    _vars[controller + "th04_window_enable"] = ""
-    _vars[controller + "th05_window_enable"] = ""
-    _vars[controller + "th06_window_enable"] = ""
-    _vars[controller + "th07_window_enable"] = ""
-    _vars[controller + "th08_window_enable"] = ""
-    _vars[controller + "th09_window_enable"] = ""
-    _vars[controller + "th00_fan_limit"] = ""
-    _vars[controller + "th01_fan_limit"] = ""
-    _vars[controller + "th02_fan_limit"] = ""
-    _vars[controller + "th03_fan_limit"] = ""
-    _vars[controller + "th04_fan_limit"] = ""
-    _vars[controller + "th05_fan_limit"] = ""
-    _vars[controller + "th06_fan_limit"] = ""
-    _vars[controller + "th07_fan_limit"] = ""
-    _vars[controller + "th08_fan_limit"] = ""
-    _vars[controller + "th09_fan_limit"] = ""
-    _vars[controller + "th00_demand_enable"] = ""
-    _vars[controller + "th01_demand_enable"] = ""
-    _vars[controller + "th02_demand_enable"] = ""
-    _vars[controller + "th03_demand_enable"] = ""
-    _vars[controller + "th04_demand_enable"] = ""
-    _vars[controller + "th05_demand_enable"] = ""
-    _vars[controller + "th06_demand_enable"] = ""
-    _vars[controller + "th07_demand_enable"] = ""
-    _vars[controller + "th08_demand_enable"] = ""
-    _vars[controller + "th09_demand_enable"] = ""
-    _vars[controller + "fc00_general_error"] = ""
-    _vars[controller + "fc01_general_error"] = ""
-    _vars[controller + "fc02_general_error"] = ""
-    _vars[controller + "fc03_general_error"] = ""
-    _vars[controller + "fc04_general_error"] = ""
-    _vars[controller + "fc05_general_error"] = ""
-    _vars[controller + "power_meter_error"] = ""
-    _vars[controller + "outdoor_temperature_enable"] = ""
-    _vars[controller + "wall_temperature_enable"] = ""
-    _vars[controller + "water_temperature_enable"] = ""
-    _vars[controller + "auxilary_temperature_enable"] = ""
-    _vars[controller + "hvac_mode"] = ""
-    return _vars
+    for name in _HIQ_TAGS:
+        variables[controller + name] = ""
+    return variables

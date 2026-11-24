@@ -14,6 +14,10 @@ merged pull requests.
 
 - Python 3.15 is supported and tested in CI. ([#377])
 
+### Removed
+
+- The dependency on `cachetools`: it was only imported for an unused cache.
+
 ### Fixed
 
 - CI installs its dependencies again on Python 3.13 and 3.14: `cffi` (a development
