@@ -9,7 +9,6 @@ from urllib.parse import unquote
 from xml.sax.saxutils import escape
 
 import aiohttp
-import backoff._async
 import pytest
 from aiohttp import web
 from aresponses import ResponsesMockServer
@@ -17,6 +16,7 @@ from aresponses import ResponsesMockServer
 from src.cybro.cybro import VAR_CHUNK_SIZE
 from src.cybro.cybro import Cybro
 from src.cybro.cybro import _build_query
+from src.cybro.cybro import _retry_wait
 from src.cybro.exceptions import CybroConnectionError
 from src.cybro.exceptions import CybroConnectionTimeoutError
 from src.cybro.exceptions import CybroEmptyResponseError
@@ -152,16 +152,19 @@ class FakeScgiServer:
 
 
 @pytest.fixture(autouse=True)
-def no_backoff_wait() -> Iterator[None]:
-    """Keep the retry count, but don't wait between retries."""
-    next_wait = backoff._async._next_wait
+def retry_waits() -> Iterator[list[int]]:
+    """Keep the retry count, but don't wait between retries.
 
-    def _no_wait(*args, **kwargs):
-        next_wait(*args, **kwargs)
+    Yields the attempts after which a retry waited.
+    """
+    attempts: list[int] = []
+
+    def _no_wait(attempt: int) -> float:
+        attempts.append(attempt)
         return 0
 
-    with patch.object(backoff._async, "_next_wait", _no_wait):
-        yield
+    with patch("src.cybro.cybro._retry_wait", _no_wait):
+        yield attempts
 
 
 @pytest.fixture
@@ -383,6 +386,31 @@ async def test_request_connection_error() -> None:
     await session.close()
 
     assert get.call_count == 3
+
+
+@pytest.mark.asyncio
+async def test_request_retry_waits(retry_waits: list[int]) -> None:
+    """A retry waits after the first and the second failed attempt."""
+    session = aiohttp.ClientSession()
+    cybro = Cybro(HOST, nad=NAD, session=session)
+    with (
+        patch.object(
+            session, "get", side_effect=aiohttp.ClientConnectionError("refused")
+        ),
+        pytest.raises(CybroConnectionError),
+    ):
+        await cybro.request(data="sys.server_version")
+    await session.close()
+
+    assert retry_waits == [1, 2]
+
+
+def test_retry_wait_limits() -> None:
+    """The wait is random, up to 1 s after attempt 1 and up to 2 s after attempt 2."""
+    for attempt, limit in ((1, 1), (2, 2)):
+        waits = [_retry_wait(attempt) for _ in range(200)]
+        assert all(0 <= wait <= limit for wait in waits)
+        assert len(set(waits)) > 1
 
 
 # --- update() ---

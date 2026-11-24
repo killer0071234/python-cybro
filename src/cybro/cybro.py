@@ -3,16 +3,21 @@
 from __future__ import annotations
 
 import asyncio
+import functools
 import json
+import random
 import socket
 from collections.abc import AsyncIterator
+from collections.abc import Awaitable
+from collections.abc import Callable
 from itertools import islice
 from typing import Any
+from typing import ParamSpec
+from typing import TypeVar
 from urllib.parse import quote
 from xml.parsers.expat import ExpatError
 
 import aiohttp
-import backoff
 import xmltodict
 from yarl import URL
 
@@ -24,6 +29,11 @@ from .models import Device
 from .models import VarType
 
 VAR_CHUNK_SIZE: int = 25
+
+RETRY_ATTEMPTS: int = 3
+
+_P = ParamSpec("_P")
+_R = TypeVar("_R")
 
 # error and state variables of the HIQ-controller program, read by update()
 _HIQ_TAGS: tuple[str, ...] = (
@@ -46,6 +56,64 @@ _HIQ_TAGS: tuple[str, ...] = (
     "auxilary_temperature_enable",
     "hvac_mode",
 )
+
+
+def _retry_wait(attempt: int) -> float:
+    """Return the seconds to wait after a failed attempt (1, 2, ...).
+
+    Exponential with full jitter: a random time up to 1 s, then up to 2 s.
+    """
+    return random.uniform(0, 2 ** (attempt - 1))  # noqa: S311 - not for security
+
+
+def _is_retryable(err: Exception) -> bool:
+    """Return whether a failed request is worth retrying.
+
+    Connection errors, timeouts and server errors (HTTP 5xx) may be temporary.
+    Client errors (HTTP 4xx) will fail again.
+
+    Args:
+        err: The exception raised by the request.
+
+    Returns:
+        True if the request should be retried.
+    """
+    if isinstance(err, CybroConnectionError):
+        return True
+    status = err.args[0] if err.args else None
+    return isinstance(status, int) and status >= 500
+
+
+def _retry(
+    exception: type[Exception],
+    retryable: Callable[[Exception], bool] = lambda _err: True,
+) -> Callable[[Callable[_P, Awaitable[_R]]], Callable[_P, Awaitable[_R]]]:
+    """Retry a coroutine function up to RETRY_ATTEMPTS times.
+
+    Args:
+        exception: The exception that causes a retry.
+        retryable: Returns False for an exception that will fail again.
+
+    Returns:
+        The decorator.
+    """
+
+    def decorator(func: Callable[_P, Awaitable[_R]]) -> Callable[_P, Awaitable[_R]]:
+        @functools.wraps(func)
+        async def wrapper(*args: _P.args, **kwargs: _P.kwargs) -> _R:
+            attempt = 1
+            while True:
+                try:
+                    return await func(*args, **kwargs)
+                except exception as err:
+                    if attempt >= RETRY_ATTEMPTS or not retryable(err):
+                        raise
+                await asyncio.sleep(_retry_wait(attempt))
+                attempt += 1
+
+        return wrapper
+
+    return decorator
 
 
 class Cybro:
@@ -93,13 +161,7 @@ class Cybro:
             self.session = None
             self._close_session = False
 
-    @backoff.on_exception(
-        backoff.expo,
-        CybroError,
-        max_tries=3,
-        giveup=lambda err: not _is_retryable(err),
-        logger=None,
-    )
+    @_retry(CybroError, _is_retryable)
     async def request(
         self,
         data: dict | str | None = None,
@@ -174,9 +236,7 @@ class Cybro:
             ) from exception
         return response_data.get("data")
 
-    @backoff.on_exception(
-        backoff.expo, CybroEmptyResponseError, max_tries=3, logger=None
-    )
+    @_retry(CybroEmptyResponseError)
     async def update(
         self, full_update: bool = False, plc_nad: int = 0, device_type: int = 0
     ) -> Device:
@@ -269,9 +329,7 @@ class Cybro:
         data = await self.request(data={name: value})
         return device.update_var(data, var_type=var_type)
 
-    @backoff.on_exception(
-        backoff.expo, CybroEmptyResponseError, max_tries=3, logger=None
-    )
+    @_retry(CybroEmptyResponseError)
     async def read_var(
         self, name: str, var_type: VarType = VarType.STR
     ) -> str | int | float | bool:
@@ -345,24 +403,6 @@ class Cybro:
             _exc_info: Exec type.
         """
         await self.disconnect()
-
-
-def _is_retryable(err: Exception) -> bool:
-    """Return whether a failed request is worth retrying.
-
-    Connection errors, timeouts and server errors (HTTP 5xx) may be temporary.
-    Client errors (HTTP 4xx) will fail again.
-
-    Args:
-        err: The exception raised by the request.
-
-    Returns:
-        True if the request should be retried.
-    """
-    if isinstance(err, CybroConnectionError):
-        return True
-    status = err.args[0] if err.args else None
-    return isinstance(status, int) and status >= 500
 
 
 def _build_query(data: dict | str | None) -> str:

@@ -17,6 +17,9 @@ merged pull requests.
 ### Removed
 
 - The dependency on `cachetools`: it was only imported for an unused cache.
+- The dependency on `backoff` (no release since 2022; it uses
+  `asyncio.iscoroutinefunction`, which Python 3.16 removes). Retries work as before:
+  up to three attempts, with a random wait of up to 1 s, then up to 2 s.
 
 ### Fixed
 
