@@ -314,18 +314,6 @@ files = [
 ]
 
 [[package]]
-name = "cachetools"
-version = "8.0.2"
-description = "Extensible memoizing collections and decorators"
-optional = false
-python-versions = ">=3.11"
-groups = ["main"]
-files = [
-    {file = "cachetools-8.0.2-py3-none-any.whl", hash = "sha256:502bf3c17c6e35d78ccdaa70da8c7001b28634541f5cde0dee33c93bb252277d"},
-    {file = "cachetools-8.0.2.tar.gz", hash = "sha256:30ac523adfc118b51d2b2e7bad8a0ddb31370dfe2700c7f10ca224f36ccf81e0"},
-]
-
-[[package]]
 name = "certifi"
 version = "2023.11.17"
 description = "Python package for providing Mozilla's CA Bundle."
@@ -2357,18 +2345,6 @@ rich = ">=10.11.0"
 shellingham = ">=1.3.0"
 
 [[package]]
-name = "types-cachetools"
-version = "7.0.0.20260713"
-description = "Typing stubs for cachetools"
-optional = false
-python-versions = ">=3.10"
-groups = ["dev"]
-files = [
-    {file = "types_cachetools-7.0.0.20260713-py3-none-any.whl", hash = "sha256:6db9bcc7a3840d39e91c04117d85a9d0937eacc9d14d12a873e2b01a2d24a71d"},
-    {file = "types_cachetools-7.0.0.20260713.tar.gz", hash = "sha256:f1acf079e9c66a81e096a897ef0b261a82117cf856834e37b4bd0c9a116a076a"},
-]
-
-[[package]]
 name = "typing-extensions"
 version = "4.16.0"
 description = "Backported and Experimental Type Hints for Python 3.9+"
@@ -2619,4 +2595,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.11"
-content-hash = "ea55a32184a1aa4a504b32e763ad0e083dd682a58ef3436d75328343e81ba952"
+content-hash = "eb5c5af69c6ea5d2cb8082d5f25bfe911a379eaf31669e4c3a74e62cbfa032ef"
